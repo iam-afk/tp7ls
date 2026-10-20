@@ -23,7 +23,8 @@
   include-файлы в любой подпапке); `tp7types.py` модель типов, диагностики типов, inlay hints; `tp7lsp.py` сервер
   (LSP 3.17, stdio; поток чтения, диагностики с задержкой); `tp7.lua` настройка Neovim; `tp7ls.py` точка входа.
 - Тесты: `for t in test_tp7*.py test_tpu_dump.py; do python3 $t; done` (должны проходить все; ~16 наборов).
-  Части тестов нужны `TURBO.TPL`, `GRAPH.TPU`, `WINXP.PAS`, ... из файлов владельца: см. `T.D` в `test_tp7lsp.py`.
+  Части тестов нужны `TURBO.TPL`, `GRAPH.TPU`, `WINXP.PAS`, ... из файлов владельца: они в `../testdata`
+  (`python3 test_tp7lsp.py ../testdata`, или `make pytest` из корня).
   В `samples/` лежат SAMPLES.PAS/.TPU, OBJECTS.TPU, TYPES_*.PAS (правильный и ошибочный код для правил типов).
 
 ## Правила работы

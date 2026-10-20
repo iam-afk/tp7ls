@@ -8,7 +8,7 @@ Language server для Turbo Pascal 7.
 
 ```
 make                       # build/tp7ls
-make test                  # тесты порта (FPCUnit)
-make pytest DATA=папка     # тесты прототипа; в папке образцы: TURBO.TPL, GRAPH.TPU, WINXP.TPU, polsk.pas, ...
-make compare FILES="python/samples ../robot"
+make test                  # тесты порта (FPCUnit), образцы из testdata/
+make pytest                # тесты прототипа на тех же образцах
+make compare FILES="testdata python/samples"
 ```

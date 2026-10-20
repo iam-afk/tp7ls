@@ -44,9 +44,9 @@ x86_64-linux). Прототип остаётся **эталонной реали
 - Порядок вычисления операндов и аргументов в FPC не определён: если в выражении несколько вызовов с побочным
   эффектом (`Tx` отмечает токен выведенным), разбивать на последовательные присваивания.
 - `tests/` FPCUnit: раннер `tests/tp7tests.lpr`, по модулю на каждый набор Python (`test_tp7lex.py` -> `tests/tlex.pas`).
-  Образцы для тестов: `python/samples` и папка из `TP7LS_DATA` (`make test DATA=папка`, имена файлов — без учёта
-  регистра, `DataFile`); тест, которому нужен
-  отсутствующий файл, помечается ignored. Тесты сверх наборов Python допустимы, если закрывают дыру в спецификации.
+  Образцы для тестов: `python/samples` и папка `TP7LS_DATA` (`make test` передаёт `testdata`; имена файлов — без
+  учёта регистра, `DataFile`); тест, которому нужен отсутствующий файл, помечается ignored (с `testdata` таких нет).
+  Тесты сверх наборов Python допустимы, если закрывают дыру в спецификации.
 - `tools/compare.py` сверка: запускает прототип и командную строку порта на одних и тех же файлах и сравнивает
   (`lex`: дамп токенов; `parse [-D SYM]`: дерево, диагностики, неактивные токены, `{$I}`, восстановление текста;
   `fmt [-D SYM] [--width N]`: вывод форматтера побайтно, stderr и код возврата; `tpu [--lib TPL]`: `--json` как
@@ -58,14 +58,14 @@ x86_64-linux). Прототип остаётся **эталонной реали
 - `build/` результаты сборки (git их игнорирует).
 
 ## Сборка и тесты
-- Папки `../intrfc70` и `../fpc-*` не трогать вовсе (не читать, не использовать для проверок). Проверочные
-  исходники и модули: `python/samples`, `../robot`, `../vdisk`, `../BP`.
-- `make` собирает `build/tp7ls`; `make test` собирает и запускает тесты FPCUnit (при ошибке код возврата != 0).
-- `make pytest DATA=папка` запускает наборы прототипа; в папке образцы владельца (TURBO.TPL, GRAPH.TPU, WINXP.TPU,
-  polsk.pas, ... см. `python/README.txt`). Без неё большинство наборов падает с ошибками (нет файлов).
-  Что есть на этой машине: `../BP/BIN/TURBO.TPL`, `../BP/UNITS/GRAPH.TPU`, `../vdisk/WINXP.*`, `../robot/polsk.pas`,
-  `../robot/option.pas`; `polsk_formatted.pas`, `option_formatted.pas`, `TEST.PAS` здесь нет.
-- `make compare FILES="python/samples ../robot"` запускает `tools/compare.py` для лексера, парсера и форматтера.
+- `testdata/` — образцы владельца для тестов (TURBO.TPL, GRAPH.TPU, POLSK.PAS/.TPU, polsk.pas, option.pas, оба
+  `*_formatted.pas`, TEST.PAS/.TPU, WINXP.PAS/.TPU). OBJECTS.TPU / VIEWS.TPU / SAMPLES*.TPU лежат в `python/samples`
+  и в `testdata` класть нельзя: `test_tp7sema.test_samples` ждёт, что модуля `objects` рядом с TEST.PAS нет.
+- `make` собирает `build/tp7ls`; `make test` собирает и запускает тесты FPCUnit (при ошибке код возврата != 0);
+  `make pytest` — все наборы прототипа (оба на `testdata`, другая папка — `DATA=папка`). Должны проходить все.
+- `make compare FILES="testdata python/samples"` запускает `tools/compare.py` для лексера, парсера и форматтера.
+- Папки `../intrfc70` и `../fpc-*` не трогать вовсе (не читать, не использовать для проверок). Для сверки с
+  прототипом на большом объёме кода годятся `../BP`, `../robot`, `../vdisk` (только читать).
 - Утечки: собрать с `heaptrc` (`fpc -O- -gl -gh ...`, в FPC нет `-O0`) и запустить тесты — должно быть
   `0 unfreed memory blocks`.
 - Ключи компилятора — в `Makefile` (`-Mobjfpc -Sh`, проверки диапазона / переполнения / ввода-вывода, assert'ы);
@@ -78,7 +78,7 @@ x86_64-linux). Прототип остаётся **эталонной реали
 ## Порядок порта
 1. Лексер (`tp7lex`) — сделано. Один лексер, написанный вручную; `lex_reference` прототипа не переносится (это
    эталон для его ускоренного варианта на регулярках). `compare.py lex` чисто на всех исходниках этой машины
-   (`python/samples`, `../robot`, `../vdisk`, `../BP`) и на случайных входах.
+   (`testdata`, `python/samples`, `../robot`, `../vdisk`, `../BP`) и на случайных входах.
 2. Парсер (`tp7parse`, вместе с `prepare`: IFDEF, `{$I}`) — сделано. Перенесены `test_tp7parse.py` и класс
    `Splice` из `test_tp7inc.py` (класс `Includes` — протокольный, переносится с сервером). `compare.py parse` чисто
    на тех же исходниках, на случайных входах (с `-D A` и без) и на испорченных настоящих программах.
@@ -87,16 +87,13 @@ x86_64-linux). Прототип остаётся **эталонной реали
 3. Форматтер (`tp7fmt`) — сделано, без `normalize` (нужен `tp7sema`; тест на это помечен ignored). Перенесён
    `test_tp7fmt.py` (`tests/tfmt.pas`). `compare.py fmt` чисто на всех исходниках этой машины, на программах со
    случайными пробелами / переводами строк / комментариями / директивами, с `-D` и на ширинах 0, 20, 40, 50, 70, 120.
-   С `TP7LS_DATA` падает `TestSemicolonBeforeUntilIsTheOnlyAddedToken` — так же, как в прототипе: `../robot/option.pas`
-   на этой машине не тот, что в образцах владельца (`;` перед `until` уже стоит).
 4. `tpu_dump` -> `tpudump` — сделано. Перенесён `test_tpu_dump.py` (`tests/ttpu.pas`, регулярные выражения через
-   `RegExpr`). `compare.py tpu` чисто на всех TPU/TPL из `../BP`, `../robot`, `../vdisk`, `python/samples`,
+   `RegExpr`). `compare.py tpu` чисто на всех TPU/TPL из `testdata`, `../BP`, `../robot`, `../vdisk`, `python/samples`,
    с `--lib TURBO.TPL` и без; `FormatG15` / `RealText` сверены с Python на 65 000 / 32 000 случайных значений.
 5. `tp7sema` и `tp7index` — сделано, нормализация в форматтере включена. Перенесены `test_tp7sema.py`
    (`tests/tsema.pas`) и класс `Tree` из `test_tp7index.py` (`tests/tindex.pas`; `Workspace` — протокольный).
    `compare.py sema` и `fmt --normalize` чисто на всех исходниках (с TPU Turbo Vision из `../BP/UNITS` и без) и на
-   4200 сломанных / случайных программах. С `TP7LS_DATA` падает ещё `TUnitFilesTest.TestSamples` — как в прототипе:
-   файлы `../robot` — уже отформатированные версии образцов владельца.
+   4200 сломанных / случайных программах.
 6. Затем `tp7types`, `tp7stub` и сервер (`tp7lsp`; JSON через fcl-json).
 
 ## Строки и кодировки (решение владельца)

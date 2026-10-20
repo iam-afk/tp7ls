@@ -1,4 +1,5 @@
 FPC      ?= fpc
+DATA     ?= testdata
 BUILD    := build
 UNITS    := $(BUILD)/units
 FPCFLAGS ?= -O2 -gl

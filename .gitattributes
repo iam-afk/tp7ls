@@ -1,4 +1,6 @@
 python/samples/*.[pP][aA][sS] text eol=crlf working-tree-encoding=CP866
 python/samples/*.[iI][nN][cC] text eol=crlf working-tree-encoding=CP866
+testdata/*.[pP][aA][sS] text eol=crlf working-tree-encoding=CP866
+testdata/*.[iI][nN][cC] text eol=crlf working-tree-encoding=CP866
 *.[tT][pP][uU] binary
 *.[tT][pP][lL] binary
