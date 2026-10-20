@@ -10,7 +10,8 @@ uses
   tfmt,
   ttpu,
   tsema,
-  tindex;
+  tindex,
+  ttyperules;
 
 var
   App: TTestRunner;

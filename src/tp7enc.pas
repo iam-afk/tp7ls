@@ -15,6 +15,7 @@ function FirstWord(const S: string): string;
 function UpperText(const S: string): string;
 function LowerText(const S: string): string;
 function PyRepr(const S: string): string;
+function CodePointOf(const S: string): LongWord;
 
 implementation
 
@@ -338,6 +339,41 @@ begin
     Inc(I);
   end;
   Result := Result + Quote;
+end;
+
+function CodePointOf(const S: string): LongWord;
+var
+  B: Byte;
+  N, I: Integer;
+begin
+  if S = '' then
+    Exit(0);
+  B := Ord(S[1]);
+  if B < $80 then
+    Exit(B);
+  if B and $E0 = $C0 then
+  begin
+    Result := B and $1F;
+    N := 1;
+  end
+  else if B and $F0 = $E0 then
+  begin
+    Result := B and $0F;
+    N := 2;
+  end
+  else if B and $F8 = $F0 then
+  begin
+    Result := B and $07;
+    N := 3;
+  end
+  else
+    Exit($FFFD);
+  for I := 2 to N + 1 do
+  begin
+    if (I > Length(S)) or (Ord(S[I]) and $C0 <> $80) then
+      Exit($FFFD);
+    Result := (Result shl 6) or (Ord(S[I]) and $3F);
+  end;
 end;
 
 end.

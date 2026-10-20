@@ -8,7 +8,7 @@ FPCFLAGS += -B -Mobjfpc -Sh -Sa -Ci -Cr -Co -vewn -Fusrc -FU$(UNITS) -FE$(BUILD)
 SRC      := $(wildcard src/*.pas src/*.lpr src/*.inc)
 TESTSRC  := $(wildcard tests/*.pas tests/*.lpr)
 PYTESTS  := $(wildcard python/test_tp7*.py) python/test_tpu_dump.py
-CLIS     := $(BUILD)/tp7lex $(BUILD)/tp7parse $(BUILD)/tp7fmt $(BUILD)/tpudump $(BUILD)/tp7sema
+CLIS     := $(BUILD)/tp7lex $(BUILD)/tp7parse $(BUILD)/tp7fmt $(BUILD)/tpudump $(BUILD)/tp7sema $(BUILD)/tp7types
 
 .PHONY: all test pytest compare clean
 

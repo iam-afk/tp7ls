@@ -296,6 +296,12 @@ var
 
 function TiOfSym(Sym: TSym): TTInfo;
 function LabelKey(const Text: string): string;
+function Kid(N: TObject; I: Integer): TObject;
+function KN(X: TObject): TNode;
+function KT(X: TObject): TToken;
+function IsNodeOf(X: TObject; Kind: TNodeKind): Boolean;
+function IsTok(X: TObject; const Text: string): Boolean;
+function FirstKid(N: TNode; Kind: TNodeKind): TNode;
 function NormalizeCase(Res: TParseResult; Provider: TProvider): TReport;
 function NormalizeCaseKeep(Res: TParseResult; Provider: TProvider; out Binder: TBinder): TReport;
 procedure LoadLibrary(const Tpl: string; out Images: TImages; out Loader: TLoader);

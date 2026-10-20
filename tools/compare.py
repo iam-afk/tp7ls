@@ -10,6 +10,8 @@
   python3 tools/compare.py sema [--path DIR]... [--tpl TURBO.TPL] FILE.PAS...   tp7sema: what every name refers to,
                                               declarations, unresolved / uncertain names, missing units, duplicates,
                                               the normalized text (build/tp7sema --dump)
+  python3 tools/compare.py types [--path DIR]... [--tpl TURBO.TPL] FILE.PAS...   tp7types: type errors, inlay hints,
+                                              types of the names, types of the expressions at operators / brackets
   python3 tools/compare.py tpu [--lib TURBO.TPL] FILE.TPU...   tpu_dump.py vs build/tpudump: --json (parsed and
                                               compared as data), --pas and --names (byte-exact)
 
@@ -125,6 +127,67 @@ def sema_dump(path, dirs, tpl):
     out.append('ERRORS %d' % len(prov.errors))
     out.append('TEXT ' + esc(reconstruct(res)))
     return ''.join(x + '\n' for x in out).encode('ascii')
+
+
+def types_dump(path, dirs, tpl):
+    from tp7parse import parse
+    from tp7sema import Binder, Provider
+    from tp7types import Types, check_types, inlay_data, expr_at, type_text, const_type_name, FLOAT
+    with open(path, 'rb') as f:
+        src = f.read().decode('cp866')
+    prov = Provider([os.path.dirname(path)] + list(dirs), tpl)
+    res = parse(src, include=prov.include_resolver(path), path=path)
+    out = []
+
+    def pos(t):
+        return '%s L%d' % (os.path.basename(t.file), t.line) if t.file else '%d:%d' % (t.line, t.col)
+    b = Binder(res, prov)
+    try:
+        b.run()
+    except BROKEN:
+        return b'BIND EXCEPTION\n'
+    try:
+        check_types(res, b, prov, lambda t, m: out.append('PROBLEM %s %s' % (pos(t), esc(m))))
+    except BROKEN:
+        out.append('EXCEPTION')
+    try:
+        d = inlay_data(res, b, prov)
+        out += ['PARAM %s %s' % (pos(t), esc(x)) for t, x in d['params']]
+        out += ['CONST %s %s' % (pos(t), esc(x)) for t, x in d['consts']]
+        out += ['END %s %s %d' % (pos(t), esc(n), k) for t, n, k in d['ends']]
+    except BROKEN:
+        out.append('INLAY EXCEPTION')
+    types = Types(prov)
+    for t in res.sig:
+        sym = b.refs.get(id(t))
+        if sym is None:
+            continue
+        try:
+            text = type_text(types.of_type_sym(sym) if sym.kind == 'type' else types.of_sym(sym))
+        except BROKEN:
+            text = '<exception>'
+        out.append('TYPE %s %s: %s' % (pos(t), esc(t.text), esc(text)))
+    for t in res.doc_sig:
+        if t.kind not in ('SYM', 'KW'):
+            continue
+        try:
+            got = expr_at(res.tree, lambda x: b.refs.get(id(x)), prov, t)
+        except BROKEN:
+            out.append('EXPR %s <exception>' % pos(t))
+            continue
+        if got is None:
+            continue
+        node, ty = got
+        toks = list(node.tokens())
+        text = type_text(ty)
+        if ty.kind == 'int' and ty.value is not None:
+            text = '%s = %d' % (const_type_name(ty), ty.value)
+        out.append('EXPR %s %s %s-%s: %s%s' % (pos(t), esc(t.text), pos(toks[0]), pos(toks[-1]), esc(text),
+                                              ' float' if ty is FLOAT else ''))
+    return ''.join(x + '\n' for x in out).encode('ascii')
+
+
+BROKEN = (IndexError, StopIteration, AttributeError, ValueError, TypeError)
 
 
 def fmt_out(path, defines, width, norm=()):
@@ -263,7 +326,7 @@ def main(argv):
     normalize = '--normalize' in argv
     if normalize:
         argv.remove('--normalize')
-    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu', 'sema'):
+    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu', 'sema', 'types'):
         print(__doc__)
         return 2
     mode = argv[1]
@@ -290,6 +353,14 @@ def main(argv):
             q = subprocess.run([binary, '--dump', *[a for d in dirs for a in ('--path', d)],
                                 *(['--tpl', tpl] if tpl else []), path], capture_output=True)
             got = q.stdout if q.returncode == 0 else b'EXCEPTION\n'
+        elif mode == 'types':
+            try:
+                ref = types_dump(path, dirs, tpl)
+            except Exception as e:
+                ref = b'CRASH\n'
+            q = subprocess.run([binary, '--dump', *[a for d in dirs for a in ('--path', d)],
+                                *(['--tpl', tpl] if tpl else []), path], capture_output=True)
+            got = q.stdout if q.returncode == 0 else b'CRASH\n'
         elif mode == 'parse':
             ref = parse_dump(path, defines)
             got = port(binary, '--dump', *[a for d in defines for a in ('-D', d)], path)
