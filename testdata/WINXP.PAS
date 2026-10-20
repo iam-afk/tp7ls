@@ -29,25 +29,25 @@ Type pView=^tView;
      pString=^tString;
      tEvent=Record
               Case Watch:Word of
-              cmMouse:(Mx,My:Integer; { я┐╜я┐╜я┐╜рдия┐╜я┐╜я┐╜я┐╜ }
-                       bMask:Byte);   { я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ }
-              cmKeyboard:(Scan,Key:Char); { я┐╜я┐╜я┐╜я┐╜тие я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ }
-              cmBroadcast:(Code:Word;     { я┐╜я┐╜я┐╜ собя┐╜я┐╜я┐╜ - я┐╜я┐╜я┐╜я┐╜таня┐╜ }
-                           Addr,InfoPtr:pView); { я┐╜я┐╜я┐╜я┐╜, я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ }
+              cmMouse:(Mx,My:Integer; { Координаты }
+                       bMask:Byte);   { Статус кнопок }
+              cmKeyboard:(Scan,Key:Char); { Событие от клавиатуры }
+              cmBroadcast:(Code:Word;     { Код события - константа }
+                           Addr,InfoPtr:pView); { Кому, от кого }
             End;
-{ я┐╜раня┐╜я┐╜ я┐╜я┐╜ своя┐╜я┐╜тва я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜ъектов }
+{ Хранит все свойства видимых объектов }
      tView=Object
              Owner:pGroup;
              Next:pView;
              x,y:Integer;
              SizeX,SizeY:Integer;
-             Status:Byte;         { я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜ъекя┐╜ (я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜, я┐╜я┐╜тивя┐╜я┐╜ я┐╜ я┐╜ я┐╜)}
-             Options:Word;       { я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ции я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜ }
+             Status:Byte;         { Статус объекта (видимый, активный и т д)}
+             Options:Word;       { Возможные операции над окном }
              DataSize:Word;
              EventMask:Word;
              Focus:Boolean;
              Constructor Init(Xn,Yn,SizeXn,SizeYn:Integer;Statusn:Byte);
-             Procedure ClearEvent(Var E:tEvent);Virtual;  { я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ собя┐╜тие }
+             Procedure ClearEvent(Var E:tEvent);Virtual;  { Очистить событие }
              Procedure Execute;Virtual;
              Procedure GetData(Var Rec);
              Procedure GetEvent(Var E:tEvent);
@@ -62,7 +62,7 @@ Type pView=^tView;
              Function Valid:Boolean;Virtual;
              Function MouseContaine:Boolean;
            End;
-{ я┐╜я┐╜редя┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ рабя┐╜я┐╜я┐╜ я┐╜ я┐╜я┐╜упоя┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜тов }
+{ Определяет возможности работы с групой элементов }
      tGroup=Object(tView)
               Last:pView;
               Current:pView;
@@ -120,7 +120,7 @@ Var DeskTop:pDeskTop;
 Implementation
 Uses Vesa,Objects,Crt;
 Const
-  HeadSize = 20;   { я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ }
+  HeadSize = 20;   { Высота заголовка окна }
 Var Page:Byte;
 {==========================================}
 Procedure ReadMouse(Var b:Byte);
@@ -162,9 +162,9 @@ m1:
   Bit:=(i=1);
 End;
 {==========================================}
-{========== я┐╜я┐╜я┐╜саня┐╜я┐╜ я┐╜я┐╜тодя┐╜я┐╜ ==============}
+{========== Описание методов ==============}
 {==========================================}
-{ я┐╜я┐╜ъекя┐╜ tView }
+{ Объект tView }
 Constructor tView.Init(Xn,Yn,SizeXn,SizeYn:Integer;Statusn:Byte);
 Begin
   x:=Xn;y:=Yn;SizeX:=SizeXn;SizeY:=SizeYn;
@@ -231,7 +231,7 @@ Begin
   Else mouseContaine:=False;
 End;
 {==========================================}
-{ я┐╜я┐╜ъекя┐╜ tGroup }
+{ Объект tGroup }
 Constructor tGroup.Init(Xn,Yn,SizeXn,SizeYn:Integer;Statusn:Byte);
 Begin
   Inherited Init(Xn,Yn,SizeXn,SizeYn,Statusn);
@@ -312,7 +312,7 @@ Begin
   Valid:=f;
 End;
 {==========================================}
-{ я┐╜я┐╜ъекя┐╜ tWindow }
+{ Объект tWindow }
 Constructor tWindow.Init(xn,yn,SizeXn,SizeYn:Integer;Namen:String);
 Begin
   SetName(Namen);
@@ -336,7 +336,7 @@ Begin
                           Inherited HandleEvent(e);
                           If e.Watch<>cmNothing
                           Then Begin
-                                 { я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜ремя┐╜щеня┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ }
+                                 { Анализ возможности перемещения окна }
                                  ClearEvent(e);
                                End;
                         End;
@@ -388,7 +388,7 @@ Begin
   Valid:=Inherited Valid;
 End;
 {==========================================}
-{ я┐╜я┐╜ъекя┐╜ tDeskTop }
+{ Объект tDeskTop }
 Constructor tDeskTop.Init(Xn,Yn,SizeXn,SizeYn:Integer;Statusn:Byte;Pic:String);
 Begin
   Inherited Init(Xn,Yn,SizeXn,SizeYn,Statusn);
@@ -468,7 +468,7 @@ Begin
   Quit:=ExitProg;
 End;
 {==========================================}
-{ я┐╜я┐╜ъекя┐╜ tButton }
+{ Объект tButton }
 Constructor tButton.Init(Xn,Yn,SizeXn,SizeYn:Integer;Active:Byte;ButName:String;Coden:Word;NewHot:Char);
 Begin
   Name:=Butname;
@@ -535,7 +535,7 @@ Begin
   End;
 End;
 {==========================================}
-{ я┐╜я┐╜ъекя┐╜ tString }
+{ Объект tString }
 Constructor tString.Init(ax,ay,aSizeX:Integer;Len:Byte;s:String);
 Begin
   x:=ax;y:=ay;DataSize:=Len;SizeX:=aSizeX;
