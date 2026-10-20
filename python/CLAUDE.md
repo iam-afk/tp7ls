@@ -1,8 +1,9 @@
 # tp7ls: language server for Turbo Pascal 7
 
 Goal: a working language server for **Turbo Pascal 7 only** (not Delphi / Object Pascal / Free Pascal dialects).
-The prototype is Python (this folder); it is to be ported to Free Pascal later. Editors: Neovim (`tp7.lua`) and Zed
-(`zed-tp7/`, never built: crates.io was unreachable where it was written; needs `rustup target add wasm32-wasip1`).
+The prototype is Python (this folder); it is being ported to Free Pascal in the parent folder (see `../CLAUDE.md`).
+Editors: Neovim (`tp7.lua`) and Zed (`zed-tp7/`, not in this repository; never built: crates.io was unreachable
+where it was written; needs `rustup target add wasm32-wasip1`).
 
 ## Fixed decisions (the owner's, do not reopen)
 - Sources are **cp866 with CRLF**. Files on disk are read as cp866; the editor sends UTF-8.
@@ -45,5 +46,5 @@ Expression hover: a byte-sized or subrange integer operation is an anonymous `in
 words); computed reals are `Real`, noted as Extended in {$N+} code ({$N} is not tracked).
 
 ## Next
-1. Port to Free Pascal (lexer, parser, formatter first; keep the tests as the specification).
+1. Port to Free Pascal: in progress in the parent folder (`../CLAUDE.md`).
 2. Build and try the Zed extension on a machine with network access.
