@@ -11,6 +11,7 @@ function DataDir: string;
 function SampleDirs: TStringArray;
 function PasFiles(const Dir: string): TStringArray;
 function Strs(const A: array of string): TStringArray;
+function DataFile(const Name: string): string;
 
 implementation
 
@@ -49,6 +50,23 @@ begin
   SetLength(Result, Length(A));
   for I := 0 to High(A) do
     Result[I] := A[I];
+end;
+
+function DataFile(const Name: string): string;
+var
+  Info: TSearchRec;
+begin
+  Result := '';
+  if DataDir = '' then
+    Exit;
+  if FindFirst(IncludeTrailingPathDelimiter(DataDir) + '*', faAnyFile, Info) = 0 then
+  begin
+    repeat
+      if SameText(Info.Name, Name) then
+        Result := IncludeTrailingPathDelimiter(DataDir) + Info.Name;
+    until (Result <> '') or (FindNext(Info) <> 0);
+    FindClose(Info);
+  end;
 end;
 
 end.

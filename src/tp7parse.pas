@@ -99,7 +99,6 @@ function Parse(const Src: string; const Defines: array of string; Include: TIncl
 function Reconstruct(R: TParseResult): string;
 procedure RoutineNames(R: TNode; out Owner, Decl: TNode);
 function FieldListOf(T: TNode): TNode;
-function PyRepr(const S: string): string;
 
 implementation
 
@@ -128,45 +127,6 @@ procedure AddToken(var Tokens: TTokens; T: TToken);
 begin
   SetLength(Tokens, Length(Tokens) + 1);
   Tokens[High(Tokens)] := T;
-end;
-
-function PyRepr(const S: string): string;
-var
-  Quote: Char;
-  I: SizeInt;
-  C: Char;
-begin
-  if (Pos('''', S) > 0) and (Pos('"', S) = 0) then
-    Quote := '"'
-  else
-    Quote := '''';
-  Result := Quote;
-  I := 1;
-  while I <= Length(S) do
-  begin
-    C := S[I];
-    if C = '\' then
-      Result := Result + '\\'
-    else if C = Quote then
-      Result := Result + '\' + C
-    else if C = #9 then
-      Result := Result + '\t'
-    else if C = #10 then
-      Result := Result + '\n'
-    else if C = #13 then
-      Result := Result + '\r'
-    else if (C < ' ') or (C = #127) then
-      Result := Result + '\x' + LowerCase(IntToHex(Ord(C), 2))
-    else if (C = #$C2) and (I < Length(S)) and (S[I + 1] in [#$85, #$A0]) then
-    begin
-      Result := Result + '\x' + LowerCase(IntToHex(Ord(S[I + 1]), 2));
-      Inc(I);
-    end
-    else
-      Result := Result + C;
-    Inc(I);
-  end;
-  Result := Result + Quote;
 end;
 
 { TNode }

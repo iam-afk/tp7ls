@@ -7,7 +7,8 @@ uses
   tlex,
   tparse,
   tinc,
-  tfmt;
+  tfmt,
+  ttpu;
 
 var
   App: TTestRunner;

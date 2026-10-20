@@ -13,6 +13,8 @@ function SpaceLen(const S: string; I: SizeInt): SizeInt;
 function StripSpace(const S: string): string;
 function FirstWord(const S: string): string;
 function UpperText(const S: string): string;
+function LowerText(const S: string): string;
+function PyRepr(const S: string): string;
 
 implementation
 
@@ -264,6 +266,78 @@ begin
     end;
     Inc(I);
   end;
+end;
+
+function LowerText(const S: string): string;
+var
+  I: SizeInt;
+  B, C: Byte;
+begin
+  Result := S;
+  UniqueString(Result);
+  I := 1;
+  while I <= Length(Result) do
+  begin
+    B := Ord(Result[I]);
+    if Result[I] in ['A'..'Z'] then
+      Result[I] := Chr(B + 32)
+    else if (I < Length(Result)) and (B = $D0) then
+    begin
+      C := Ord(Result[I + 1]);
+      if C in [$90..$9F] then
+        Result[I + 1] := Chr(C + $20)
+      else if C in [$A0..$AF] then
+      begin
+        Result[I] := Chr($D1);
+        Result[I + 1] := Chr(C - $20);
+      end
+      else if C in [$80..$8F] then
+      begin
+        Result[I] := Chr($D1);
+        Result[I + 1] := Chr(C + $10);
+      end;
+    end;
+    Inc(I);
+  end;
+end;
+
+function PyRepr(const S: string): string;
+var
+  Quote: Char;
+  I: SizeInt;
+  C: Char;
+begin
+  if (Pos('''', S) > 0) and (Pos('"', S) = 0) then
+    Quote := '"'
+  else
+    Quote := '''';
+  Result := Quote;
+  I := 1;
+  while I <= Length(S) do
+  begin
+    C := S[I];
+    if C = '\' then
+      Result := Result + '\\'
+    else if C = Quote then
+      Result := Result + '\' + C
+    else if C = #9 then
+      Result := Result + '\t'
+    else if C = #10 then
+      Result := Result + '\n'
+    else if C = #13 then
+      Result := Result + '\r'
+    else if (C < ' ') or (C = #127) then
+      Result := Result + '\x' + LowerCase(IntToHex(Ord(C), 2))
+    else if (C = #$C2) and (I < Length(S)) and (S[I + 1] in [#$80..#$A0, #$AD]) then
+    begin
+      Result := Result + '\x' + LowerCase(IntToHex(Ord(S[I + 1]), 2));
+      Inc(I);
+    end
+    else
+      Result := Result + C;
+    Inc(I);
+  end;
+  Result := Result + Quote;
 end;
 
 end.

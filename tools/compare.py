@@ -7,7 +7,10 @@
                                               of python/tp7fmt.py  vs  build/tp7fmt FILE  (--width: format_source(width=N)
                                               in-process vs  build/tp7fmt -w N; 0 = never wrap)
 
-A directory argument stands for every *.pas / *.inc in it (recursively).  --bin DIR overrides the directory of
+  python3 tools/compare.py tpu [--lib TURBO.TPL] FILE.TPU...   tpu_dump.py vs build/tpudump: --json (parsed and
+                                              compared as data), --pas and --names (byte-exact)
+
+A directory argument stands for every *.pas / *.inc in it (recursively; *.tpu / *.tpl for `tpu`).  --bin DIR overrides the directory of
 the port's binaries (default: build/).  Exit status 1 if any file differs.
 
 Token dump format (the port must print exactly this, one token per line, cp866 bytes of the text):
@@ -100,15 +103,62 @@ def port_fmt(binary, path, defines, width):
                                       capture_output=True))
 
 
-def files(args):
+def files(args, exts=('.pas', '.inc')):
     for a in args:
         if os.path.isdir(a):
             for d, _, names in os.walk(a):
                 for n in sorted(names):
-                    if n.lower().endswith(('.pas', '.inc')):
+                    if n.lower().endswith(exts):
                         yield os.path.join(d, n)
         else:
             yield a
+
+
+def first_data_diff(a, b, path='$'):
+    if type(a) != type(b):
+        return '%s: %r vs %r' % (path, a, b)
+    if isinstance(a, dict):
+        for k in sorted(set(a) | set(b)):
+            if k not in a or k not in b:
+                return '%s.%s: missing in %s' % (path, k, 'python' if k not in a else 'port')
+            d = first_data_diff(a[k], b[k], '%s.%s' % (path, k))
+            if d:
+                return d
+        return None
+    if isinstance(a, list):
+        if len(a) != len(b):
+            return '%s: %d vs %d items' % (path, len(a), len(b))
+        for i, (x, y) in enumerate(zip(a, b)):
+            d = first_data_diff(x, y, '%s[%d]' % (path, i))
+            if d:
+                return d
+        return None
+    return None if a == b else '%s: %r vs %r' % (path, a, b)
+
+
+def compare_tpu(binary, path, lib):
+    import json
+    extra = ['--lib', lib] if lib else []
+    out = []
+    for mode in ('--json', '--pas', '--names'):
+        p = subprocess.run([sys.executable, os.path.join(ROOT, 'python', 'tpu_dump.py'), path, *extra, mode],
+                           capture_output=True)
+        q = subprocess.run([binary, path, *extra, mode], capture_output=True)
+        if p.returncode != q.returncode:
+            out.append('%s: exit %d vs %d (%s)' % (mode, p.returncode, q.returncode, p.stderr.decode()[-300:]))
+        elif p.returncode != 0 and p.stdout == q.stdout == b'':
+            continue
+        elif mode == '--json':
+            try:
+                d = first_data_diff(json.loads(p.stdout), json.loads(q.stdout))
+            except ValueError as e:
+                d = 'not JSON (%s): python %r..., port %r...' % (e, p.stdout[:60], q.stdout[:60])
+            if d:
+                out.append('--json ' + d)
+        elif p.stdout != q.stdout:
+            line, x, y = first_diff(p.stdout, q.stdout)
+            out.append('%s line %d\n    python: %s\n    port:   %s' % (mode, line, x.decode(), y.decode()))
+    return out
 
 
 def first_diff(a, b):
@@ -136,17 +186,28 @@ def main(argv):
         i = argv.index('-D')
         defines.append(argv[i + 1])
         del argv[i:i + 2]
-    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt'):
+    lib = None
+    if '--lib' in argv:
+        i = argv.index('--lib')
+        lib = argv[i + 1]
+        del argv[i:i + 2]
+    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu'):
         print(__doc__)
         return 2
     mode = argv[1]
-    binary = os.path.join(bindir, 'tp7' + mode)
+    binary = os.path.join(bindir, 'tpudump' if mode == 'tpu' else 'tp7' + mode)
     if not os.path.exists(binary):
         print('no %s: build the port first (make)' % binary)
         return 2
     bad = total = 0
-    for path in files(argv[2:]):
+    for path in files(argv[2:], ('.tpu', '.tpl') if mode == 'tpu' else ('.pas', '.inc')):
         total += 1
+        if mode == 'tpu':
+            diffs = compare_tpu(binary, path, lib)
+            if diffs:
+                bad += 1
+                print('DIFF %s\n  %s' % (path, '\n  '.join(diffs)))
+            continue
         if mode == 'lex':
             ref, got = lex_dump(path), port(binary, '--dump', path)
         elif mode == 'parse':
