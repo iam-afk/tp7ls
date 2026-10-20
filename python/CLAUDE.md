@@ -1,50 +1,53 @@
-# tp7ls: language server for Turbo Pascal 7
+# tp7ls: language server для Turbo Pascal 7
 
-Goal: a working language server for **Turbo Pascal 7 only** (not Delphi / Object Pascal / Free Pascal dialects).
-The prototype is Python (this folder); it is being ported to Free Pascal in the parent folder (see `../CLAUDE.md`).
-Editors: Neovim (`tp7.lua`) and Zed (`zed-tp7/`, not in this repository; never built: crates.io was unreachable
-where it was written; needs `rustup target add wasm32-wasip1`).
+Цель: рабочий language server **только для Turbo Pascal 7** (не диалекты Delphi / Object Pascal / Free Pascal).
+Прототип на Python (эта папка); он переносится на Free Pascal в родительской папке (см. `../CLAUDE.md`).
+Редакторы: Neovim (`tp7.lua`) и Zed (`zed-tp7/`, в этом репозитории нет; ни разу не собирался: там, где его писали,
+не было доступа к crates.io; нужен `rustup target add wasm32-wasip1`).
 
-## Fixed decisions (the owner's, do not reopen)
-- Sources are **cp866 with CRLF**. Files on disk are read as cp866; the editor sends UTF-8.
-- Formatting is **hard-fixed, no options**. Reference style: `polsk_formatted.pas`, `option_formatted.pas`.
-  Blank line between declarations is mandatory; `else if` on one line; one field per line; lines over 120 chars wrap.
-- Identifier case is normalized to the **declaration spelling** (also for System / other units).
-- Conditional compilation (`{$IFDEF}`) and `{$I file}` are supported in the parser.
-- Messages are in English; the owner talks Russian.
+## Зафиксированные решения (владельца, не пересматривать)
+- Исходники в **cp866 с CRLF**. Файлы с диска читаются как cp866; редактор присылает UTF-8.
+- Форматирование **жёстко зафиксировано, без опций**. Эталон стиля: `polsk_formatted.pas`, `option_formatted.pas`.
+  Пустая строка между объявлениями обязательна; `else if` на одной строке; одно поле на строку; строки длиннее
+  120 символов переносятся.
+- Регистр идентификаторов приводится к **написанию в объявлении** (в том числе для System и других модулей).
+- Условная компиляция (`{$IFDEF}`) и `{$I файл}` поддерживаются в парсере.
+- Сообщения сервера на английском; владелец говорит по-русски. Документация (`.md`) и сообщения коммитов на русском,
+  коммиты немногословные.
 
-## Layout
-- `tp7lex.py` lossless lexer; `tp7parse.py` tolerant CST parser (`prepare` handles IFDEF and `{$I}`);
-  `tp7fmt.py` formatter (re-emits from the CST); `tp7sema.py` Binder (refs/decls/scopes) + Provider (units from .pas,
-  .tpu, TURBO.TPL; overlay of open buffers); `tpu_dump.py` TPU/TPL reader; `tp7stub.py` generates read-only unit stubs;
-  `tp7index.py` index of the project tree (units / includes in any subfolder); `tp7types.py` type model, type
-  diagnostics, inlay hints; `tp7lsp.py` the server (LSP 3.17, stdio; reader thread, debounced diagnostics);
-  `tp7.lua` Neovim setup; `tp7ls.py` entry point.
-- Tests: `for t in test_tp7*.py test_tpu_dump.py; do python3 $t; done` (all must pass; ~16 suites).
-  Some tests need `TURBO.TPL`, `GRAPH.TPU`, `WINXP.PAS`, ... from the owner's uploads: see `T.D` in `test_tp7lsp.py`.
-  `samples/` holds SAMPLES.PAS/.TPU, OBJECTS.TPU, TYPES_*.PAS (valid and invalid code for the type rules).
+## Устройство
+- `tp7lex.py` лексер без потерь; `tp7parse.py` толерантный CST-парсер (`prepare` обрабатывает IFDEF и `{$I}`);
+  `tp7fmt.py` форматтер (заново выводит текст из CST); `tp7sema.py` Binder (ссылки / объявления / области видимости)
+  + Provider (модули из .pas, .tpu, TURBO.TPL; поверх них открытые буферы); `tpu_dump.py` чтение TPU/TPL;
+  `tp7stub.py` генерирует заглушки модулей (только для чтения); `tp7index.py` индекс дерева проекта (модули /
+  include-файлы в любой подпапке); `tp7types.py` модель типов, диагностики типов, inlay hints; `tp7lsp.py` сервер
+  (LSP 3.17, stdio; поток чтения, диагностики с задержкой); `tp7.lua` настройка Neovim; `tp7ls.py` точка входа.
+- Тесты: `for t in test_tp7*.py test_tpu_dump.py; do python3 $t; done` (должны проходить все; ~16 наборов).
+  Части тестов нужны `TURBO.TPL`, `GRAPH.TPU`, `WINXP.PAS`, ... из файлов владельца: см. `T.D` в `test_tp7lsp.py`.
+  В `samples/` лежат SAMPLES.PAS/.TPU, OBJECTS.TPU, TYPES_*.PAS (правильный и ошибочный код для правил типов).
 
-## Rules of the work
-- **No false positives.** A new diagnostic must be silent on anything not understood (UNKNOWN type is compatible
-  with everything). Check against real programs (`WINXP.PAS`, `POLSK.PAS`, `TEST.PAS`, `option.pas`) before shipping.
-- TPU format facts were verified on real samples (see comments marked `[verified: ...]` in `tpu_dump.py`). Do not
-  guess new ones: ask the owner for a compiled sample (`SAMPLES.PAS` is the template for that).
-- Server options (`initializationOptions`): `tp7Dir`, `stubDir`, `typeDiagnostics` (default true),
+## Правила работы
+- **Никаких ложных срабатываний.** Новая диагностика молчит обо всём, что не понято (тип UNKNOWN совместим со всем).
+  Перед выпуском проверять на настоящих программах (`WINXP.PAS`, `POLSK.PAS`, `TEST.PAS`, `option.pas`).
+- Факты о формате TPU проверены на реальных образцах (комментарии с пометкой `[verified: ...]` в `tpu_dump.py`).
+  Новые не угадывать: просить у владельца скомпилированный образец (шаблон для этого — `SAMPLES.PAS`).
+- Опции сервера (`initializationOptions`): `tp7Dir`, `stubDir`, `typeDiagnostics` (по умолчанию true),
   `inlayHints {parameters, constants, endLabels}`.
 
-## Done
-Formatting, name normalization, diagnostics (unknown names / units, duplicates, unused, missing implementations,
-type errors), hover (also the type of an expression on an operator / bracket / `^`), definition / declaration / typeDefinition / implementation, references, rename, document and
-workspace symbols, completion, signature help, semantic tokens, selection / range formatting, code actions,
-inlay hints, `{$I}`, object types and parameter names from TPU, unit stubs, project index.
+## Сделано
+Форматирование, нормализация имён, диагностики (неизвестные имена / модули, повторы, неиспользуемое, нет реализации,
+ошибки типов), hover (в том числе тип выражения на операторе / скобке / `^`), definition / declaration /
+typeDefinition / implementation, references, rename, символы документа и рабочей области, completion, signature help,
+semantic tokens, selection / range formatting, code actions, inlay hints, `{$I}`, объектные типы и имена параметров
+из TPU, заглушки модулей, индекс проекта.
 
-## Known limitations
-`packed` and `far` are not stored in TPU; variant records are shown flat; inline bytes are not decoded;
-rename across `{$I}` files is refused; hex literals are not range-checked; `{$V-}` is ignored;
-typed-constant initializers and declaration-part expressions are not type-checked.
-Expression hover: a byte-sized or subrange integer operation is an anonymous `integer` (the guide widens bytes to
-words); computed reals are `Real`, noted as Extended in {$N+} code ({$N} is not tracked).
+## Известные ограничения
+`packed` и `far` в TPU не хранятся; вариантные записи показываются плоско; inline-байты не декодируются;
+rename через файлы `{$I}` отклоняется; шестнадцатеричные литералы не проверяются на диапазон; `{$V-}` игнорируется;
+инициализаторы типизированных констант и выражения в разделе объявлений не проверяются на типы.
+Hover выражения: операция над байтовым или поддиапазонным целым — анонимный `integer` (по руководству байты
+расширяются до слов); вычисленные вещественные — `Real`, в коде с {$N+} помечаются как Extended ({$N} не отслеживается).
 
-## Next
-1. Port to Free Pascal: in progress in the parent folder (`../CLAUDE.md`).
-2. Build and try the Zed extension on a machine with network access.
+## Дальше
+1. Порт на Free Pascal: идёт в родительской папке (`../CLAUDE.md`).
+2. Собрать и попробовать расширение для Zed на машине с доступом в сеть.
