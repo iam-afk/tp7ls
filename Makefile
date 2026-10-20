@@ -7,10 +7,11 @@ FPCFLAGS += -B -Mobjfpc -Sh -Sa -Ci -Cr -Co -vewn -Fusrc -FU$(UNITS) -FE$(BUILD)
 SRC      := $(wildcard src/*.pas src/*.lpr src/*.inc)
 TESTSRC  := $(wildcard tests/*.pas tests/*.lpr)
 PYTESTS  := $(wildcard python/test_tp7*.py) python/test_tpu_dump.py
+CLIS     := $(BUILD)/tp7lex $(BUILD)/tp7parse
 
 .PHONY: all test pytest compare clean
 
-all: $(BUILD)/tp7ls $(BUILD)/tp7lex
+all: $(BUILD)/tp7ls $(CLIS)
 
 $(UNITS):
 	mkdir -p $@
@@ -18,8 +19,8 @@ $(UNITS):
 $(BUILD)/tp7ls: $(SRC) | $(UNITS)
 	$(FPC) $(FPCFLAGS) src/tp7ls.lpr
 
-$(BUILD)/tp7lex: $(SRC) | $(UNITS)
-	$(FPC) $(FPCFLAGS) -o$(BUILD)/tp7lex src/tp7lexcli.lpr
+$(CLIS): $(BUILD)/%: src/%cli.lpr $(SRC) | $(UNITS)
+	$(FPC) $(FPCFLAGS) -o$@ $<
 
 $(BUILD)/tp7tests: $(SRC) $(TESTSRC) | $(UNITS)
 	$(FPC) $(FPCFLAGS) -Futests tests/tp7tests.lpr
@@ -32,6 +33,7 @@ pytest:
 
 compare: all
 	python3 tools/compare.py lex $(FILES)
+	python3 tools/compare.py parse $(FILES)
 
 clean:
 	rm -rf $(BUILD)

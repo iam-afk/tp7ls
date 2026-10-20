@@ -8,15 +8,24 @@ type
   TTokenKind = (tkWS, tkNL, tkComment, tkDirective, tkCtrlZ, tkIdent, tkKW, tkInt, tkHex, tkReal, tkString,
     tkCharCode, tkSym, tkAsmLabel, tkError, tkEOF);
 
-  TToken = record
+  TToken = class;
+  TTokens = array of TToken;
+
+  TToken = class
+  public
     Kind: TTokenKind;
     Text: string;
     Pos: SizeInt;
     Line: Integer;
     Col: SizeInt;
+    Active: Boolean;
+    Leading: TTokens;
+    Idx: SizeInt;
+    FileName: string;
+    Via: TToken;
+    constructor Create(AKind: TTokenKind; const AText: string; APos: SizeInt; ALine: Integer; ACol: SizeInt);
+    function Lower: string;
   end;
-
-  TTokens = array of TToken;
 
 const
   TokenKindNames: array[TTokenKind] of string = ('WS', 'NL', 'COMMENT', 'DIRECTIVE', 'CTRLZ', 'IDENT', 'KW', 'INT',
@@ -24,6 +33,7 @@ const
   Trivia = [tkWS, tkNL, tkComment, tkDirective, tkCtrlZ];
 
 function IsReserved(const Name: string): Boolean;
+procedure FreeTokens(var Tokens: TTokens);
 function Lex(const Src: string): TTokens;
 function Significant(const Tokens: TTokens): TTokens;
 function JoinText(const Tokens: TTokens): string;
@@ -47,6 +57,31 @@ const
   IdentStart = ['A'..'Z', 'a'..'z', '_'];
   IdentChars = IdentStart + Digits;
   CtrlZTail = [#26, #13, #10, ' ', #9];
+
+constructor TToken.Create(AKind: TTokenKind; const AText: string; APos: SizeInt; ALine: Integer; ACol: SizeInt);
+begin
+  Kind := AKind;
+  Text := AText;
+  Pos := APos;
+  Line := ALine;
+  Col := ACol;
+  Active := True;
+  Idx := -1;
+end;
+
+function TToken.Lower: string;
+begin
+  Result := LowerCase(Text);
+end;
+
+procedure FreeTokens(var Tokens: TTokens);
+var
+  T: TToken;
+begin
+  for T in Tokens do
+    T.Free;
+  Tokens := nil;
+end;
 
 function IsReserved(const Name: string): Boolean;
 var
@@ -91,11 +126,7 @@ var
   begin
     if Count = Length(Result) then
       SetLength(Result, 2 * Count + 64);
-    Result[Count].Kind := Kind;
-    Result[Count].Text := Copy(Src, I, Stop - I);
-    Result[Count].Pos := I;
-    Result[Count].Line := Line;
-    Result[Count].Col := I - LineStart + 1;
+    Result[Count] := TToken.Create(Kind, Copy(Src, I, Stop - I), I, Line, I - LineStart + 1);
     Inc(Count);
     I := Stop;
   end;
@@ -340,8 +371,12 @@ begin
 end;
 
 function RoundtripOk(const Src: string): Boolean;
+var
+  Tokens: TTokens;
 begin
-  Result := JoinText(Lex(Src)) = Src;
+  Tokens := Lex(Src);
+  Result := JoinText(Tokens) = Src;
+  FreeTokens(Tokens);
 end;
 
 end.

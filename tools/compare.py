@@ -2,6 +2,7 @@
 """Differential check of the Free Pascal port against the Python prototype (python/).
 
   python3 tools/compare.py lex FILE.PAS...    tokens:  python/tp7lex.py  vs  build/tp7lex --dump FILE
+  python3 tools/compare.py parse [-D SYM]... FILE.PAS...   tree, diagnostics, inactive tokens, {$I}, roundtrip
   python3 tools/compare.py fmt FILE.PAS...    output:  python/tp7fmt.py  vs  build/tp7fmt FILE   (byte-exact)
 
 A directory argument stands for every *.pas / *.inc in it (recursively).  --bin DIR overrides the directory of
@@ -11,6 +12,10 @@ Token dump format (the port must print exactly this, one token per line, cp866 b
   KIND LINE:COL TEXT
 TEXT (the rest of the line) is the token text with every byte outside 0x20..0x7E and the backslash written as
 \\xHH, upper-case hex (CRLF is \\x0D\\x0A).
+
+Parse dump: the tree, a node per line (its kind, indented by two spaces per level), its tokens as in the token dump
+one level deeper; then  DIAG LINE:COL MESSAGE,  INACTIVE LINE:COL  for every inactive token,
+INCLUDE LINE:COL NAME,  and  ROUNDTRIP OK | BROKEN.
 """
 import os
 import subprocess
@@ -28,7 +33,33 @@ def lex_dump(path):
     from tp7lex import lex
     with open(path, 'rb') as f:
         src = f.read().decode('cp866')
-    return ''.join('%s %d:%d %s\n' % (t.kind, t.line, t.col, esc(t.text)) for t in lex(src)).encode('ascii')
+    return ''.join(tok_line(t) + '\n' for t in lex(src)).encode('ascii')
+
+
+def tok_line(t):
+    return '%s %d:%d %s' % (t.kind, t.line, t.col, esc(t.text))
+
+
+def parse_dump(path, defines):
+    from tp7parse import DEFAULT_DEFINES, Node, parse, reconstruct
+    with open(path, 'rb') as f:
+        src = f.read().decode('cp866')
+    r = parse(src, list(DEFAULT_DEFINES) + defines)
+    out = []
+
+    def node(n, depth):
+        out.append('  ' * depth + n.kind)
+        for k in n.kids:
+            if isinstance(k, Node):
+                node(k, depth + 1)
+            else:
+                out.append('  ' * (depth + 1) + tok_line(k))
+    node(r.tree, 0)
+    out += ['DIAG %d:%d %s' % (t.line, t.col, esc(m)) for t, m in r.diags]
+    out += ['INACTIVE %d:%d' % (t.line, t.col) for t in r.tokens if not t.active]
+    out += ['INCLUDE %d:%d %s' % (x[0].line, x[0].col, esc(x[1])) for x in r.includes]
+    out.append('ROUNDTRIP ' + ('OK' if reconstruct(r) == src else 'BROKEN'))
+    return ''.join(s + '\n' for s in out).encode('ascii')
 
 
 def fmt_out(path):
@@ -66,7 +97,12 @@ def main(argv):
         i = argv.index('--bin')
         bindir = argv[i + 1]
         del argv[i:i + 2]
-    if len(argv) < 3 or argv[1] not in ('lex', 'fmt'):
+    defines = []
+    while '-D' in argv:
+        i = argv.index('-D')
+        defines.append(argv[i + 1])
+        del argv[i:i + 2]
+    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt'):
         print(__doc__)
         return 2
     mode = argv[1]
@@ -79,6 +115,9 @@ def main(argv):
         total += 1
         if mode == 'lex':
             ref, got = lex_dump(path), port(binary, '--dump', path)
+        elif mode == 'parse':
+            ref = parse_dump(path, defines)
+            got = port(binary, '--dump', *[a for d in defines for a in ('-D', d)], path)
         else:
             ref, got = fmt_out(path), port(binary, path)
         if ref != got:

@@ -51,6 +51,7 @@ end;
 var
   Src: string;
   Mode: string;
+  Tokens: TTokens;
 begin
   if (ParamCount < 1) or (ParamCount > 2) then
   begin
@@ -69,10 +70,11 @@ begin
       Halt(1);
     end;
   end;
+  Tokens := Lex(Src);
   if Mode = '--dump' then
-    Dump(Src, Lex(Src))
+    Dump(Src, Tokens)
   else if Mode = '--check' then
-    Check(Src, Lex(Src))
+    Check(Src, Tokens)
   else
   begin
     WriteLn(StdErr, 'error: unknown option ', Mode);

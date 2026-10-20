@@ -28,66 +28,61 @@ type
 implementation
 
 uses
-  SysUtils, tp7enc, tp7lex;
+  SysUtils, tp7enc, tp7lex, tutil;
 
-function SampleDirs: TStringArray;
-begin
-  Result := [ExpandFileName(ExtractFilePath(ParamStr(0)) + '../python/samples')];
-  if GetEnvironmentVariable('TP7LS_DATA') <> '' then
-    Result := Concat(Result, [GetEnvironmentVariable('TP7LS_DATA')]);
-end;
-
-function Describe(const Tokens: TTokens; WithText: Boolean): string;
+function Describe(const Src: string; SignificantOnly, WithText: Boolean): string;
 var
+  All: TTokens;
   T: TToken;
 begin
   Result := '';
-  for T in Tokens do
+  All := Lex(Src);
+  for T in All do
   begin
+    if SignificantOnly and (T.Kind in Trivia + [tkEOF]) then
+      Continue;
     if Result <> '' then
       Result := Result + ' ';
     Result := Result + TokenKindNames[T.Kind];
     if WithText then
       Result := Result + '(' + T.Text + ')';
   end;
+  FreeTokens(All);
 end;
 
 function Kinds(const Src: string): string;
 begin
-  Result := Describe(Significant(Lex(Src)), True);
+  Result := Describe(Src, True, True);
 end;
 
 function KindsOnly(const Src: string): string;
 begin
-  Result := Describe(Lex(Src), False);
+  Result := Describe(Src, False, False);
 end;
 
 function SignificantKinds(const Src: string): string;
 begin
-  Result := Describe(Significant(Lex(Src)), False);
+  Result := Describe(Src, True, False);
 end;
 
 procedure TLexerTest.TestRoundtripSamples;
 var
-  Dir, Src: string;
-  Info: TSearchRec;
+  Dir, Path, Src: string;
+  Tokens: TTokens;
   T: TToken;
   Count: Integer;
 begin
   Count := 0;
   for Dir in SampleDirs do
-    if FindFirst(IncludeTrailingPathDelimiter(Dir) + '*', faAnyFile, Info) = 0 then
+    for Path in PasFiles(Dir) do
     begin
-      repeat
-        if UpperCase(ExtractFileExt(Info.Name)) <> '.PAS' then
-          Continue;
-        Inc(Count);
-        Src := ReadSource(IncludeTrailingPathDelimiter(Dir) + Info.Name);
-        AssertEquals(Info.Name, Src, JoinText(Lex(Src)));
-        for T in Lex(Src) do
-          AssertFalse(Info.Name + ' ' + T.Text, T.Kind = tkError);
-      until FindNext(Info) <> 0;
-      FindClose(Info);
+      Inc(Count);
+      Src := ReadSource(Path);
+      Tokens := Lex(Src);
+      AssertEquals(Path, Src, JoinText(Tokens));
+      for T in Tokens do
+        AssertFalse(Path + ' ' + T.Text, T.Kind = tkError);
+      FreeTokens(Tokens);
     end;
   AssertTrue(Count > 0);
 end;
@@ -195,6 +190,7 @@ begin
       Positions := Positions + Format('%s%d:%d ', [T.Text, T.Line, T.Col]);
   AssertEquals('a1:1 b2:1 c3:1 d4:1 e5:4 ', Positions);
   AssertEquals(5, Tokens[High(Tokens)].Line);
+  FreeTokens(Tokens);
 end;
 
 procedure TLexerTest.TestCtrlZ;

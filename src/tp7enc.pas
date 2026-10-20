@@ -9,6 +9,10 @@ function Utf8ToCp866(const S: string): RawByteString;
 function ReadFileBytes(const Path: string): RawByteString;
 function ReadSource(const Path: string): string;
 function Utf8Length(const S: string; First, Last: SizeInt): SizeInt;
+function SpaceLen(const S: string; I: SizeInt): SizeInt;
+function StripSpace(const S: string): string;
+function FirstWord(const S: string): string;
+function UpperText(const S: string): string;
 
 implementation
 
@@ -161,6 +165,105 @@ begin
   for I := First to Last do
     if Ord(S[I]) and $C0 <> $80 then
       Inc(Result);
+end;
+
+function SpaceLen(const S: string; I: SizeInt): SizeInt;
+
+  function At(K: SizeInt): Byte;
+  begin
+    if I + K <= Length(S) then
+      Result := Ord(S[I + K])
+    else
+      Result := 0;
+  end;
+
+begin
+  Result := 0;
+  case At(0) of
+    9..13, 28..32:
+      Result := 1;
+    $C2:
+      if At(1) in [$85, $A0] then
+        Result := 2;
+    $E1:
+      if (At(1) = $9A) and (At(2) = $80) then
+        Result := 3;
+    $E2:
+      if ((At(1) = $80) and (At(2) in [$80..$8A, $A8, $A9, $AF])) or ((At(1) = $81) and (At(2) = $9F)) then
+        Result := 3;
+    $E3:
+      if (At(1) = $80) and (At(2) = $80) then
+        Result := 3;
+  end;
+end;
+
+function StripSpace(const S: string): string;
+var
+  I, First, Stop, Len: SizeInt;
+begin
+  I := 1;
+  First := 0;
+  Stop := 0;
+  while I <= Length(S) do
+  begin
+    Len := SpaceLen(S, I);
+    if Len = 0 then
+    begin
+      if First = 0 then
+        First := I;
+      Inc(I);
+      while (I <= Length(S)) and (Ord(S[I]) and $C0 = $80) do
+        Inc(I);
+      Stop := I;
+    end
+    else
+      Inc(I, Len);
+  end;
+  if First = 0 then
+    Result := ''
+  else
+    Result := Copy(S, First, Stop - First);
+end;
+
+function FirstWord(const S: string): string;
+var
+  T: string;
+  I: SizeInt;
+begin
+  T := StripSpace(S);
+  I := 1;
+  while (I <= Length(T)) and (SpaceLen(T, I) = 0) do
+    Inc(I);
+  Result := Copy(T, 1, I - 1);
+end;
+
+function UpperText(const S: string): string;
+var
+  I: SizeInt;
+  B: Byte;
+begin
+  Result := S;
+  UniqueString(Result);
+  I := 1;
+  while I <= Length(Result) do
+  begin
+    B := Ord(Result[I]);
+    if Result[I] in ['a'..'z'] then
+      Result[I] := Chr(B - 32)
+    else if (I < Length(Result)) and (B = $D0) and (Ord(Result[I + 1]) in [$B0..$BF]) then
+      Result[I + 1] := Chr(Ord(Result[I + 1]) - $20)
+    else if (I < Length(Result)) and (B = $D1) and (Ord(Result[I + 1]) in [$80..$8F]) then
+    begin
+      Result[I] := Chr($D0);
+      Result[I + 1] := Chr(Ord(Result[I + 1]) + $20);
+    end
+    else if (I < Length(Result)) and (B = $D1) and (Ord(Result[I + 1]) in [$90..$9F]) then
+    begin
+      Result[I] := Chr($D0);
+      Result[I + 1] := Chr(Ord(Result[I + 1]) - $10);
+    end;
+    Inc(I);
+  end;
 end;
 
 end.

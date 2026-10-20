@@ -4,7 +4,9 @@ program tp7tests;
 
 uses
   consoletestrunner,
-  tlex;
+  tlex,
+  tparse,
+  tinc;
 
 var
   App: TTestRunner;
