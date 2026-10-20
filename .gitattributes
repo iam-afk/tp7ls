@@ -1,0 +1,5 @@
+# Turbo Pascal sources are cp866 with CRLF: store them byte-exact.
+*.[pP][aA][sS] -text
+*.[iI][nN][cC] -text
+*.[tT][pP][uU] binary
+*.[tT][pP][lL] binary
