@@ -15,12 +15,14 @@ x86_64-linux). Прототип остаётся **эталонной реали
 
 ## Устройство
 - `src/` порт. `src/tp7ls.lpr` точка входа; модули называются по модулям Python
-  (`tp7lex.py` -> `src/tp7lex.pas`, `tpu_dump.py` -> `src/tpudump.pas`, ...).
+  (`tp7lex.py` -> `src/tp7lex.pas`, `tpu_dump.py` -> `src/tpudump.pas`, ...). `src/tp7enc.pas` перекодировка
+  cp866 <-> UTF-8 и чтение файлов. Программы командной строки — `src/*cli.lpr`, собираются в `build/` без `cli`
+  (`src/tp7lexcli.lpr` -> `build/tp7lex`).
 - `tests/` FPCUnit: раннер `tests/tp7tests.lpr`, по модулю на каждый набор Python (`test_tp7lex.py` -> `tests/tlex.pas`).
-  `tests/tsmoke.pas` только проверяет сам раннер; удалить, когда появится первый настоящий набор.
+  Образцы для тестов: `python/samples` и папка из `TP7LS_DATA` (`make test DATA=папка`).
 - `tools/compare.py` сверка: запускает прототип и командную строку порта на одних и тех же файлах и сравнивает
   (`lex`: дамп токенов, формат описан в docstring скрипта; `fmt`: вывод форматтера, побайтно).
-  Ожидает программы `build/tp7lex` и `build/tp7fmt` (исходники `src/tp7lexcli.lpr`, ... ещё предстоит написать).
+  Работает с программами `build/tp7lex` и `build/tp7fmt` (вторую ещё предстоит написать).
 - `python/` прототип; при переносе в папку не менялся (кроме `CLAUDE.md`). Его тесты запускаются из любого каталога.
 - `build/` результаты сборки (git их игнорирует).
 
@@ -39,8 +41,9 @@ x86_64-linux). Прототип остаётся **эталонной реали
   добавить в `.gitattributes`. Исходники порта (`src/`, `tests/`) — обычные, UTF-8 с LF.
 
 ## Порядок порта
-1. Лексер (`tp7lex`) + командная строка с `--dump`; перенести `test_tp7lex.py`; `compare.py lex` чисто на всех
-   доступных исходниках.
+1. Лексер (`tp7lex`) — сделано. Один лексер, написанный вручную; `lex_reference` прототипа не переносится (это
+   эталон для его ускоренного варианта на регулярках). `compare.py lex` чисто на всех исходниках этой машины
+   (`python/samples`, `../robot`, `../vdisk`, `../BP`, `../intrfc70`, `../fpc-3.2.2`) и на случайных входах.
 2. Парсер (`tp7parse`, вместе с `prepare`: IFDEF, `{$I}`); перенести `test_tp7parse.py`, `test_tp7inc.py`.
 3. Форматтер (`tp7fmt`) + командная строка; перенести `test_tp7fmt.py`; `compare.py fmt` побайтно совпадает.
 4. Затем `tpu_dump`, `tp7sema`, `tp7types`, `tp7stub`, `tp7index` и сервер (`tp7lsp`; JSON через fcl-json).

@@ -4,7 +4,7 @@ program tp7tests;
 
 uses
   consoletestrunner,
-  tsmoke;
+  tlex;
 
 var
   App: TTestRunner;

@@ -10,7 +10,7 @@ PYTESTS  := $(wildcard python/test_tp7*.py) python/test_tpu_dump.py
 
 .PHONY: all test pytest compare clean
 
-all: $(BUILD)/tp7ls
+all: $(BUILD)/tp7ls $(BUILD)/tp7lex
 
 $(UNITS):
 	mkdir -p $@
@@ -18,18 +18,20 @@ $(UNITS):
 $(BUILD)/tp7ls: $(SRC) | $(UNITS)
 	$(FPC) $(FPCFLAGS) src/tp7ls.lpr
 
+$(BUILD)/tp7lex: $(SRC) | $(UNITS)
+	$(FPC) $(FPCFLAGS) -o$(BUILD)/tp7lex src/tp7lexcli.lpr
+
 $(BUILD)/tp7tests: $(SRC) $(TESTSRC) | $(UNITS)
 	$(FPC) $(FPCFLAGS) -Futests tests/tp7tests.lpr
 
 test: $(BUILD)/tp7tests
-	$(BUILD)/tp7tests
+	TP7LS_DATA=$(DATA) $(BUILD)/tp7tests
 
 pytest:
 	@rc=0; for t in $(PYTESTS); do echo "== $$t"; python3 $$t $(DATA) || rc=1; done; exit $$rc
 
 compare: all
 	python3 tools/compare.py lex $(FILES)
-	python3 tools/compare.py fmt $(FILES)
 
 clean:
 	rm -rf $(BUILD)
