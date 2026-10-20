@@ -1,6 +1,4 @@
 program tp7tests;
-{ Test runner (FPCUnit).  The Python suites in python/test_*.py are the specification: port their cases
-  into units here, one unit per suite (test_tp7lex.py -> tlex.pas, ...), and add them to the uses clause. }
 
 {$mode objfpc}{$H+}
 

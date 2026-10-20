@@ -1,5 +1,4 @@
 unit tsmoke;
-{ Checks that the test harness itself works.  Remove once real suites exist. }
 
 {$mode objfpc}{$H+}
 

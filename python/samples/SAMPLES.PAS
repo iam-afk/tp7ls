@@ -18,7 +18,7 @@ const
   cExpr     = 1000 * 60 + 5;
   cChar     = 'A';
   cCtl      = #13;
-  cCyr      = '�';
+  cCyr      = 'Ж';
   cBoolT    = True;
   cBoolF    = False;
   cReal     = 3.14159;
@@ -26,7 +26,7 @@ const
   cRealNeg  = -0.001;
   cStr      = 'it''s a string';
   cStrEmpty = '';
-  cStrCyr   = '�ਢ��';
+  cStrCyr   = 'Привет';
   cStrCtl   = #27'[0m';
   cStrLong  = '0123456789012345678901234567890123456789012345678901234567890123456789';
   cSetDigit = ['0'..'9'];

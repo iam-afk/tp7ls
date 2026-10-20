@@ -1,6 +1,4 @@
 program tp7ls;
-{ tp7ls - language server for Turbo Pascal 7 (Free Pascal port of python/tp7ls.py).
-  For now only the command line; the server comes after the lexer, parser and formatter. }
 
 {$mode objfpc}{$H+}
 

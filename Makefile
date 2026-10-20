@@ -1,7 +1,3 @@
-# tp7ls, Free Pascal port.  `make` builds build/tp7ls, `make test` runs the FPCUnit tests,
-# `make pytest DATA=dir` runs the Python prototype's suites (DATA: the owner's samples, TURBO.TPL etc.),
-# `make compare FILES=...` checks the port against the prototype (see tools/compare.py).
-
 FPC      ?= fpc
 BUILD    := build
 UNITS    := $(BUILD)/units
