@@ -253,7 +253,7 @@ begin
   R := P(ReadSource(IncludeTrailingPathDelimiter(DataDir) + 'TEST.PAS'));
   U := R.Tree.First(nkUnit);
   AssertEquals('DeclName Interface Implementation InitSection', NodeKinds(U));
-  for Uses_ in ['Ident', 'str_15', 'pZnach', 'tZnach', 'tNode', 'tMainVar', 'MainLex', 'cmProg'] do
+  for Uses_ in Strs(['Ident', 'str_15', 'pZnach', 'tZnach', 'tNode', 'tMainVar', 'MainLex', 'cmProg']) do
     AssertTrue(Uses_, Pos(' ' + Uses_ + ' ', ' ' + DeclNames(R) + ' ') > 0);
   Uses_ := '';
   for N in U.First(nkUsesClause).Nodes(nkName) do
@@ -625,7 +625,7 @@ procedure TRecoveryTest.TestEmptyAndWhitespaceOnly;
 var
   S: string;
 begin
-  for S in ['', '   '#10, '{just a comment}', #26] do
+  for S in Strs(['', '   '#10, '{just a comment}', #26]) do
     Check(S);
 end;
 
@@ -777,8 +777,8 @@ procedure TPointerToStringTest.TestPointerToTheReservedWordString;
 var
   Src: string;
 begin
-  for Src in ['unit u; interface type T = object S: ^String; N: Byte; end; var P: ^string; implementation end.',
-    'program p; type PS = ^String; var Q: ^String; begin end.'] do
+  for Src in Strs(['unit u; interface type T = object S: ^String; N: Byte; end; var P: ^string; implementation end.',
+    'program p; type PS = ^String; var Q: ^String; begin end.']) do
     AssertEquals(Src, '', Diags(P(Src)));
 end;
 

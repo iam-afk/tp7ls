@@ -10,6 +10,7 @@ uses
 function DataDir: string;
 function SampleDirs: TStringArray;
 function PasFiles(const Dir: string): TStringArray;
+function Strs(const A: array of string): TStringArray;
 
 implementation
 
@@ -38,6 +39,16 @@ begin
     until FindNext(Info) <> 0;
     FindClose(Info);
   end;
+end;
+
+function Strs(const A: array of string): TStringArray;
+var
+  I: Integer;
+begin
+  Result := nil;
+  SetLength(Result, Length(A));
+  for I := 0 to High(A) do
+    Result[I] := A[I];
 end;
 
 end.

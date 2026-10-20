@@ -3,7 +3,9 @@
 
   python3 tools/compare.py lex FILE.PAS...    tokens:  python/tp7lex.py  vs  build/tp7lex --dump FILE
   python3 tools/compare.py parse [-D SYM]... FILE.PAS...   tree, diagnostics, inactive tokens, {$I}, roundtrip
-  python3 tools/compare.py fmt FILE.PAS...    output:  python/tp7fmt.py  vs  build/tp7fmt FILE   (byte-exact)
+  python3 tools/compare.py fmt [-D SYM]... [--width N] FILE.PAS...   output (byte-exact), stderr and exit status
+                                              of python/tp7fmt.py  vs  build/tp7fmt FILE  (--width: format_source(width=N)
+                                              in-process vs  build/tp7fmt -w N; 0 = never wrap)
 
 A directory argument stands for every *.pas / *.inc in it (recursively).  --bin DIR overrides the directory of
 the port's binaries (default: build/).  Exit status 1 if any file differs.
@@ -62,13 +64,40 @@ def parse_dump(path, defines):
     return ''.join(s + '\n' for s in out).encode('ascii')
 
 
-def fmt_out(path):
-    p = subprocess.run([sys.executable, os.path.join(ROOT, 'python', 'tp7fmt.py'), path], capture_output=True)
-    return p.stdout
+def fmt_out(path, defines, width):
+    if width is not None:
+        return fmt_width(path, defines, width)
+    p = subprocess.run([sys.executable, os.path.join(ROOT, 'python', 'tp7fmt.py'), path,
+                        *[a for d in defines for a in ('-D', d)]], capture_output=True)
+    return with_stderr(p)
+
+
+def fmt_width(path, defines, width):
+    from tp7fmt import FormatError, format_source
+    from tp7parse import DEFAULT_DEFINES
+    with open(path, 'rb') as f:
+        src = f.read().decode('cp866')
+    warnings = []
+    try:
+        out, err, code = format_source(src, list(DEFAULT_DEFINES) + defines, width=width, warnings=warnings), b'', 0
+    except FormatError as e:
+        out, err, code = '', ('error: %s\n' % e).encode(), 2
+    err = b''.join(('warning: %s\n' % w).encode() for w in warnings) + err
+    return out.encode('cp866') + b'\n--- stderr, exit %d\n' % code + err
+
+
+def with_stderr(p):
+    return p.stdout + b'\n--- stderr, exit %d\n' % p.returncode + p.stderr
 
 
 def port(binary, *args):
     return subprocess.run([binary, *args], capture_output=True).stdout
+
+
+def port_fmt(binary, path, defines, width):
+    w = ['-w', str(width)] if width is not None else []
+    return with_stderr(subprocess.run([binary, path, *w, *[a for d in defines for a in ('-D', d)]],
+                                      capture_output=True))
 
 
 def files(args):
@@ -97,6 +126,11 @@ def main(argv):
         i = argv.index('--bin')
         bindir = argv[i + 1]
         del argv[i:i + 2]
+    width = None
+    if '--width' in argv:
+        i = argv.index('--width')
+        width = int(argv[i + 1])
+        del argv[i:i + 2]
     defines = []
     while '-D' in argv:
         i = argv.index('-D')
@@ -119,7 +153,7 @@ def main(argv):
             ref = parse_dump(path, defines)
             got = port(binary, '--dump', *[a for d in defines for a in ('-D', d)], path)
         else:
-            ref, got = fmt_out(path), port(binary, path)
+            ref, got = fmt_out(path, defines, width), port_fmt(binary, path, defines, width)
         if ref != got:
             bad += 1
             line, x, y = first_diff(ref, got)

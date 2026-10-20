@@ -6,7 +6,8 @@ uses
   consoletestrunner,
   tlex,
   tparse,
-  tinc;
+  tinc,
+  tfmt;
 
 var
   App: TTestRunner;

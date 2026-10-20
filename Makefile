@@ -7,7 +7,7 @@ FPCFLAGS += -B -Mobjfpc -Sh -Sa -Ci -Cr -Co -vewn -Fusrc -FU$(UNITS) -FE$(BUILD)
 SRC      := $(wildcard src/*.pas src/*.lpr src/*.inc)
 TESTSRC  := $(wildcard tests/*.pas tests/*.lpr)
 PYTESTS  := $(wildcard python/test_tp7*.py) python/test_tpu_dump.py
-CLIS     := $(BUILD)/tp7lex $(BUILD)/tp7parse
+CLIS     := $(BUILD)/tp7lex $(BUILD)/tp7parse $(BUILD)/tp7fmt
 
 .PHONY: all test pytest compare clean
 
@@ -34,6 +34,7 @@ pytest:
 compare: all
 	python3 tools/compare.py lex $(FILES)
 	python3 tools/compare.py parse $(FILES)
+	python3 tools/compare.py fmt $(FILES)
 
 clean:
 	rm -rf $(BUILD)
