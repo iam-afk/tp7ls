@@ -5,7 +5,7 @@ unit tp7fmt;
 interface
 
 uses
-  Classes, SysUtils, tp7lex, tp7parse;
+  Classes, SysUtils, tp7lex, tp7parse, tp7sema;
 
 const
   IndentStep = 2;
@@ -22,7 +22,7 @@ function WrapLine(const Line: string; Width: Integer = MaxWidth; Step: Integer =
 function FormatParsed(R: TParseResult; Width: Integer = MaxWidth; Warnings: TStrings = nil): string;
 function FormatSource(const Src: string): string;
 function FormatSource(const Src: string; const Defines: array of string; Width: Integer = MaxWidth;
-  Warnings: TStrings = nil): string;
+  Warnings: TStrings = nil; Normalize: Boolean = False; Provider: TProvider = nil): string;
 
 implementation
 
@@ -1973,7 +1973,7 @@ begin
 end;
 
 function FormatSource(const Src: string; const Defines: array of string; Width: Integer;
-  Warnings: TStrings): string;
+  Warnings: TStrings; Normalize: Boolean; Provider: TProvider): string;
 var
   R: TParseResult;
   T: TToken;
@@ -1986,6 +1986,8 @@ begin
       raise EFormatError.CreateFmt('not formatting a file with syntax problems (%d:%d: %s)',
         [T.Line, Utf8Length(Src, T.Pos - T.Col + 1, T.Pos - 1) + 1, R.Diags[0].Message]);
     end;
+    if Normalize then
+      NormalizeCase(R, Provider);
     Result := FormatParsed(R, Width, Warnings);
   finally
     R.Free;

@@ -1042,7 +1042,8 @@ end;
 
 procedure TFmtObjectsTest.TestSectionMarkersBecomeLowerCaseWhenNormalising;
 begin
-  Ignore('needs tp7sema (identifier normalisation), not ported yet');
+  AssertTrue(Contains(FormatSource('program t;'#10'type T = object'#10'  x: Integer;'#10'  PRIVATE'#10'  y: Byte;'#10'end;'#10 +
+    'begin end.'#10, DefaultDefines, MaxWidth, nil, True, nil), #10'  private'#10));
 end;
 
 procedure TFmtObjectsTest.TestCommentsAndTokensSurvive;

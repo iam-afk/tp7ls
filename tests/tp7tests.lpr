@@ -8,7 +8,9 @@ uses
   tparse,
   tinc,
   tfmt,
-  ttpu;
+  ttpu,
+  tsema,
+  tindex;
 
 var
   App: TTestRunner;

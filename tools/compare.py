@@ -3,10 +3,13 @@
 
   python3 tools/compare.py lex FILE.PAS...    tokens:  python/tp7lex.py  vs  build/tp7lex --dump FILE
   python3 tools/compare.py parse [-D SYM]... FILE.PAS...   tree, diagnostics, inactive tokens, {$I}, roundtrip
-  python3 tools/compare.py fmt [-D SYM]... [--width N] FILE.PAS...   output (byte-exact), stderr and exit status
+  python3 tools/compare.py fmt [-D SYM]... [--width N] [--normalize [--path DIR]... [--tpl TPL]] FILE.PAS...   output (byte-exact), stderr and exit status
                                               of python/tp7fmt.py  vs  build/tp7fmt FILE  (--width: format_source(width=N)
                                               in-process vs  build/tp7fmt -w N; 0 = never wrap)
 
+  python3 tools/compare.py sema [--path DIR]... [--tpl TURBO.TPL] FILE.PAS...   tp7sema: what every name refers to,
+                                              declarations, unresolved / uncertain names, missing units, duplicates,
+                                              the normalized text (build/tp7sema --dump)
   python3 tools/compare.py tpu [--lib TURBO.TPL] FILE.TPU...   tpu_dump.py vs build/tpudump: --json (parsed and
                                               compared as data), --pas and --names (byte-exact)
 
@@ -67,11 +70,68 @@ def parse_dump(path, defines):
     return ''.join(s + '\n' for s in out).encode('ascii')
 
 
-def fmt_out(path, defines, width):
+def sema_dump(path, dirs, tpl):
+    from tp7lex import Token
+    from tp7parse import parse, reconstruct, ROUTINE_DIRECTIVES
+    from tp7sema import Binder, Provider
+    with open(path, 'rb') as f:
+        src = f.read().decode('cp866')
+    prov = Provider(dirs or [os.path.dirname(os.path.abspath(path))], tpl)
+    res = parse(src, include=prov.include_resolver(path), path=path)
+    for t in res.sig:
+        if t.kind == 'KW':
+            t.text = t.text.lower()
+    for n in res.tree.walk():
+        if n.kind == 'Directives':
+            for t in n.kids:
+                if isinstance(t, Token) and t.kind == 'IDENT' and t.text.lower() in ROUTINE_DIRECTIVES:
+                    t.text = t.text.lower()
+        elif n.kind in ('Absolute', 'Section') and n.kids and isinstance(n.kids[0], Token):
+            n.kids[0].text = n.kids[0].text.lower()
+    b = Binder(res, prov)
+    b.run()
+
+    def pos(t):
+        return '%s L%d' % (os.path.basename(t.file), t.line) if t.file else '%d:%d' % (t.line, t.col)
+
+    def where(s):
+        if s.tok is not None:
+            w = 'L%d' % s.tok.line
+            if s.file and os.path.abspath(s.file) != os.path.abspath(path):
+                w += ' ' + os.path.basename(s.file)
+        elif s.kind == 'unit':
+            w = 'unit:' + (os.path.basename(s.file) if s.file else 'lib')
+        elif s.lib:
+            w = '@' + (s.home or '?')
+        elif s.implicit:
+            w = 'self'
+        else:
+            w = '-'
+        return '%s %s %s' % (s.kind, esc(s.name), w)
+    out = []
+    for t in res.sig:
+        s = b.refs.get(id(t))
+        if s is not None:
+            out.append('REF %s %s -> %s' % (pos(t), esc(t.text), where(s)))
+    for t in res.sig:
+        s = b.decls.get(id(t))
+        if s is not None:
+            out.append('DECL %s %s -> %s' % (pos(t), esc(t.text), where(s)))
+    out += ['UNRESOLVED %s %s' % (pos(t), esc(t.text)) for t in b.unresolved]
+    out += ['UNCERTAIN %s %s' % (pos(t), esc(t.text)) for t in b.uncertain]
+    out += ['MISSING %s %s' % (pos(t), esc(t.text)) for t in b.missing_units]
+    out += ['DUP %s %s -> %s' % (pos(t), esc(t.text), where(o)) for t, o in b.dups]
+    out.append('RENAMED %d' % b.renamed)
+    out.append('ERRORS %d' % len(prov.errors))
+    out.append('TEXT ' + esc(reconstruct(res)))
+    return ''.join(x + '\n' for x in out).encode('ascii')
+
+
+def fmt_out(path, defines, width, norm=()):
     if width is not None:
         return fmt_width(path, defines, width)
     p = subprocess.run([sys.executable, os.path.join(ROOT, 'python', 'tp7fmt.py'), path,
-                        *[a for d in defines for a in ('-D', d)]], capture_output=True)
+                        *[a for d in defines for a in ('-D', d)], *norm], capture_output=True)
     return with_stderr(p)
 
 
@@ -97,9 +157,9 @@ def port(binary, *args):
     return subprocess.run([binary, *args], capture_output=True).stdout
 
 
-def port_fmt(binary, path, defines, width):
+def port_fmt(binary, path, defines, width, norm=()):
     w = ['-w', str(width)] if width is not None else []
-    return with_stderr(subprocess.run([binary, path, *w, *[a for d in defines for a in ('-D', d)]],
+    return with_stderr(subprocess.run([binary, path, *w, *[a for d in defines for a in ('-D', d)], *norm],
                                       capture_output=True))
 
 
@@ -186,12 +246,24 @@ def main(argv):
         i = argv.index('-D')
         defines.append(argv[i + 1])
         del argv[i:i + 2]
+    dirs, tpl = [], None
+    while '--path' in argv:
+        i = argv.index('--path')
+        dirs.append(argv[i + 1])
+        del argv[i:i + 2]
+    if '--tpl' in argv:
+        i = argv.index('--tpl')
+        tpl = argv[i + 1]
+        del argv[i:i + 2]
     lib = None
     if '--lib' in argv:
         i = argv.index('--lib')
         lib = argv[i + 1]
         del argv[i:i + 2]
-    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu'):
+    normalize = '--normalize' in argv
+    if normalize:
+        argv.remove('--normalize')
+    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu', 'sema'):
         print(__doc__)
         return 2
     mode = argv[1]
@@ -210,11 +282,22 @@ def main(argv):
             continue
         if mode == 'lex':
             ref, got = lex_dump(path), port(binary, '--dump', path)
+        elif mode == 'sema':
+            try:
+                ref = sema_dump(path, dirs, tpl)
+            except Exception as e:
+                ref = b'EXCEPTION\n'
+            q = subprocess.run([binary, '--dump', *[a for d in dirs for a in ('--path', d)],
+                                *(['--tpl', tpl] if tpl else []), path], capture_output=True)
+            got = q.stdout if q.returncode == 0 else b'EXCEPTION\n'
         elif mode == 'parse':
             ref = parse_dump(path, defines)
             got = port(binary, '--dump', *[a for d in defines for a in ('-D', d)], path)
         else:
-            ref, got = fmt_out(path, defines, width), port_fmt(binary, path, defines, width)
+            norm = []
+            if normalize:
+                norm = ['--normalize', *[a for d in dirs for a in ('--path', d)], *(['--tpl', tpl] if tpl else [])]
+            ref, got = fmt_out(path, defines, width, norm), port_fmt(binary, path, defines, width, norm)
         if ref != got:
             bad += 1
             line, x, y = first_diff(ref, got)
