@@ -129,7 +129,8 @@ x86_64-linux). Прототип остаётся **эталонной реали
 8. Сервер (`tp7lsp`) — сделано. Протокольные наборы прототипа (`test_tp7lsp`, `test_tp7diag`, `test_tp7edit`,
    `test_tp7oop`, классы с сервером из `test_tp7stub`, `test_tp7tpuobj`, `test_tp7inc`, `test_tp7index`,
    `test_tp7types`, `test_tp7perf`) — «чёрный ящик» через stdio: `tools/pyproto.py` (`make prototest`) запускает их
-   без изменений против `build/tp7ls`, все проходят. В FPCUnit (`tests/tlsp.pas`) перенесены тесты внутренностей:
+   без изменений против `build/tp7ls`, все проходят. Решение владельца: протокольные тесты так и остаются
+   (`make prototest`), в FPCUnit их не переписывать. В FPCUnit (`tests/tlsp.pas`) перенесены тесты внутренностей:
    `EditComputation` и `Queueing` / `Dependents` / `Caches` из `test_tp7perf.py`, плюс тест выбора `positionEncoding`.
    `compare.py lsp` (одна и та же сессия через оба сервера, ответы сравниваются как данные; внутренние ошибки
    -32603 равны при любом тексте) чисто на `testdata`, `python/samples`, `../robot`, `../vdisk` (каждый токен),
