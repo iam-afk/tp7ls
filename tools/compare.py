@@ -12,6 +12,9 @@
                                               the normalized text (build/tp7sema --dump)
   python3 tools/compare.py types [--path DIR]... [--tpl TURBO.TPL] FILE.PAS...   tp7types: type errors, inlay hints,
                                               types of the names, types of the expressions at operators / brackets
+  python3 tools/compare.py stub [--lib TURBO.TPL] FILE.TPU...   tp7stub: the text of every unit's stub and its index
+                                              (ENTRY kind|owner|name line col len, col / len in UTF-8 bytes, the
+                                              declaration and the length of the block of each entry; build/tp7stub --dump)
   python3 tools/compare.py tpu [--lib TURBO.TPL] FILE.TPU...   tpu_dump.py vs build/tpudump: --json (parsed and
                                               compared as data), --pas and --names (byte-exact)
 
@@ -284,6 +287,36 @@ def compare_tpu(binary, path, lib):
     return out
 
 
+def stub_dump(path, lib):
+    from tpu_dump import Loader, split_images
+    from tp7sema import Provider
+    from tp7stub import render
+    if lib is None:
+        cand = os.path.join(os.path.dirname(os.path.abspath(path)), 'TURBO.TPL')
+        lib = cand if os.path.exists(cand) and os.path.abspath(cand) != os.path.abspath(path) else None
+    imgs = split_images(open(path, 'rb').read())
+    n = len(imgs)
+    if lib:
+        imgs += split_images(open(lib, 'rb').read())
+    prov = Provider(dirs=[os.path.dirname(os.path.abspath(path))])
+    prov.lib_images = split_images(open(lib, 'rb').read()) if lib else []
+    imgs += prov._tpu_dependencies(imgs, os.path.dirname(os.path.abspath(path)))
+    ld = Loader(imgs, primary=n)
+    out = []
+    for k in ld.primary:
+        st = render(ld.units[k], os.path.abspath(path))
+        out.append(st.text)
+        for key, (ln, col, length) in st.index.items():
+            kind, owner, name = key[0], key[1] if len(key) == 3 else '', key[-1] if len(key) > 1 else ''
+            text = st.lines[ln]
+            col, length = len(text[:col].encode()), len((name or text[col:col + length]).encode())
+            out.append('ENTRY %s|%s|%s %d %d %d\n' % (kind, owner, name, ln, col, length))
+            k2 = 'routine' if kind == 'method' else kind
+            out.append('DECL %s\n' % st.declaration(k2, name, owner or None))
+            out.append('BLOCK %d\n' % len(st.block(k2, name, owner or None)))
+    return ''.join(out).encode('utf-8')
+
+
 def first_diff(a, b):
     la, lb = a.splitlines(), b.splitlines()
     for i, (x, y) in enumerate(zip(la, lb)):
@@ -326,7 +359,7 @@ def main(argv):
     normalize = '--normalize' in argv
     if normalize:
         argv.remove('--normalize')
-    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu', 'sema', 'types'):
+    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu', 'sema', 'types', 'stub'):
         print(__doc__)
         return 2
     mode = argv[1]
@@ -335,8 +368,21 @@ def main(argv):
         print('no %s: build the port first (make)' % binary)
         return 2
     bad = total = 0
-    for path in files(argv[2:], ('.tpu', '.tpl') if mode == 'tpu' else ('.pas', '.inc')):
+    for path in files(argv[2:], ('.tpu', '.tpl') if mode in ('tpu', 'stub') else ('.pas', '.inc')):
         total += 1
+        if mode == 'stub':
+            try:
+                ref = stub_dump(path, lib)
+            except Exception as e:
+                ref = b''
+            q = subprocess.run([binary, path, *(['--lib', lib] if lib else []), '--dump'], capture_output=True)
+            got = q.stdout
+            if ref != got:
+                bad += 1
+                line, x, y = first_diff(ref, got)
+                print('DIFF %s line %d\n    python: %s\n    port:   %s' % (path, line, x.decode('utf-8', 'replace'),
+                                                                    y.decode('utf-8', 'replace')))
+            continue
         if mode == 'tpu':
             diffs = compare_tpu(binary, path, lib)
             if diffs:

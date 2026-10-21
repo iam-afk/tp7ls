@@ -158,7 +158,6 @@ type
     function FindFile(const Key, Ext, First: string; Deep: Boolean; const Near: string): string;
     function FromSource(const Key: string): TUnitInfo;
     function FromTpuFile(const Key: string): TUnitInfo;
-    function TpuDependencies(const Imgs: TImages; const Home: string): TImages;
     function FromTpuUnit(U: TUnit; const Origin: string): TUnitInfo;
   public
     Dirs: TStringArray;
@@ -184,6 +183,7 @@ type
     procedure SetOverlay(const Path, Text: string);
     procedure ClearOverlay(const Path: string);
     function TInfoFromTDesc(TD: TTypeDesc; Depth: Integer = 0; const Home: string = ''; const Owner: string = ''): TTInfo;
+    function TpuDependencies(const Imgs: TImages; const Home: string): TImages;
   end;
 
   TSymNodePair = record

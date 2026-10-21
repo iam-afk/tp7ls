@@ -11,7 +11,9 @@ uses
   ttpu,
   tsema,
   tindex,
-  ttyperules;
+  ttyperules,
+  tstubs,
+  ttpuobj;
 
 var
   App: TTestRunner;
