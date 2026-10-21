@@ -10,7 +10,7 @@ TESTSRC  := $(wildcard tests/*.pas tests/*.lpr)
 PYTESTS  := $(wildcard python/test_tp7*.py) python/test_tpu_dump.py
 CLIS     := $(BUILD)/tp7lex $(BUILD)/tp7parse $(BUILD)/tp7fmt $(BUILD)/tpudump $(BUILD)/tp7sema $(BUILD)/tp7types $(BUILD)/tp7stub
 
-.PHONY: all test pytest prototest compare clean
+.PHONY: all test leaks pytest prototest compare clean
 
 all: $(BUILD)/tp7ls $(CLIS)
 
@@ -28,6 +28,13 @@ $(BUILD)/tp7tests: $(SRC) $(TESTSRC) | $(UNITS)
 
 test: $(BUILD)/tp7tests
 	TP7LS_DATA=$(DATA) $(BUILD)/tp7tests
+
+$(BUILD)/tp7leaks: $(SRC) $(TESTSRC) | $(UNITS)
+	$(FPC) $(FPCFLAGS) -O- -gh -Futests -o$@ tests/tp7tests.lpr
+
+leaks: $(BUILD)/tp7leaks
+	TP7LS_DATA=$(DATA) $(BUILD)/tp7leaks 2>$(BUILD)/heaptrc.txt; rc=$$?; cat $(BUILD)/heaptrc.txt; \
+	test $$rc = 0 && grep -q '^0 unfreed memory blocks' $(BUILD)/heaptrc.txt
 
 pytest:
 	@rc=0; for t in $(PYTESTS); do echo "== $$t"; python3 $$t $(DATA) || rc=1; done; exit $$rc
