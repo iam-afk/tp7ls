@@ -220,7 +220,6 @@ type
     function SystemScope: TScope;
     function UsesScope(Uses_: TNode; Parent: TScope): TScope;
     function TiNodeUncached(Node: TObject; Scope: TScope): TTInfo;
-    function TypeTi(Sym: TSym): TTInfo;
     procedure NoteDecl(Tok: TToken; Sym: TSym);
     function MakeSym(Tok: TToken; Kind: TSymKind; TNode: TObject; Scope: TScope; Node: TNode = nil): TSym;
     procedure Declare(Scope: TScope; Sym: TSym);
@@ -266,6 +265,7 @@ type
     constructor Create(ARes: TParseResult; AProvider: TProvider; AExportOnly: Boolean = False);
     destructor Destroy; override;
     function TiNode(Node: TObject; Scope: TScope): TTInfo;
+    function TypeTi(Sym: TSym): TTInfo;
     function RecordTi(Node: TNode; Scope: TScope): TTInfo;
     function PtrTarget(NameNode: TNode; Scope: TScope): TTInfo;
     function TypeSym(NameNode: TObject; Scope: TScope; DoRewrite: Boolean = False): TSym;

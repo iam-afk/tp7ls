@@ -3,24 +3,35 @@ program tp7ls;
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils;
+{$IFDEF UNIX}
+  cthreads,
+{$ENDIF}
+  Classes, SysUtils, tp7lsp;
 
-const
-  Version = '0.0.1';
-
-procedure Usage;
-begin
-  WriteLn('usage: tp7ls [--version]');
-  WriteLn('  the language server is not ported yet; use python/tp7lsp.py');
-end;
+var
+  Input_, Output_: THandleStream;
+  Server: TServer;
+  Transport: TStreamTransport;
+  Code: Integer;
 
 begin
   if (ParamCount = 1) and (ParamStr(1) = '--version') then
-    WriteLn('tp7ls ', Version)
-  else
   begin
-    Usage;
-    if ParamCount > 0 then
-      Halt(1);
+    WriteLn(ServerName, ' ', ServerVersion);
+    Exit;
   end;
+  Input_ := THandleStream.Create(StdInputHandle);
+  Output_ := THandleStream.Create(StdOutputHandle);
+  Transport := TStreamTransport.Create(Input_, Output_);
+  Server := TServer.Create(Transport);
+  Code := Server.Run;
+  Flush(StdErr);
+  if Server.ReaderFinished then
+  begin
+    Server.Free;
+    Transport.Free;
+    Output_.Free;
+    Input_.Free;
+  end;
+  Halt(Code);
 end.

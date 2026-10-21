@@ -47,6 +47,16 @@ x86_64-linux). Прототип остаётся **эталонной реали
   длина в байтах UTF-8 (у прототипа — в символах; совпадают, пока имена ASCII). `Render` отдаёт `TStub` вызывающему;
   `TStubStore` владеет своими заглушками. `\w` / `\b` регулярок прототипа — по символам: кириллица (U+0400..U+04FF)
   тоже буква, другие не-ASCII символы cp866 — нет.
+- `src/tp7lsp.pas` (сервер) + `src/tp7ls.lpr` (точка входа, stdio). JSON — fcl-json, но `\u`-escape входящих
+  сообщений раскрываются в UTF-8 до разбора (fcl-json 3.2.2 портит суррогатные пары), а ответы пишет свой
+  сериализатор. `DefaultSystemCodePage := CP_UTF8` (инициализация `tp7lsp`): `UTF8String` fcl-json и наш `string`
+  без перекодировок. Позиции: `positionEncoding` `utf-8`, если клиент его предлагает (`general.positionEncodings`),
+  иначе `utf-16`, как в прототипе (глобальный `PositionsInBytes`). Владение: всё, что вытеснено из кешей
+  (`BoundCache`, `ProvCache` — 6 провайдеров, как в прототипе), и временные разборы других файлов уходят в «кладбище»
+  (`Bury` после каждого сообщения), чтобы не освободить то, на что ещё ссылается текущий запрос. Провайдер,
+  вытесненный из кеша, уносит с собой привязки (`TBound`) из `BoundCache`, которые на него ссылаются. `difflib`
+  (`SequenceMatcher.get_opcodes`, `get_close_matches`) — `src/tp7diff.pas`, сверен с Python на случайных входах.
+  `\w` / `isalnum` Python — `IsWordCodePoint` (`tp7enc`, таблица из `unicodedata`).
 - Рекурсивный вызов функции внутри неё самой писать со скобками (`TypeSpec()`): без них FPC читает имя функции
   как её результат.
 - `for S in ['a', 'bcd']` в FPC 3.2.2 молча обрезает строки до длины первого литерала (тип выводится как короткая
@@ -65,7 +75,8 @@ x86_64-linux). Прототип остаётся **эталонной реали
   `build/tp7fmt` (`-w N` — ширина, 0 — без переноса, `--normalize --path --tpl`), `build/tpudump`, `build/tp7sema`
   (`--dump`); `sema [--path] [--tpl]`: на что ссылается каждое имя, объявления, неразрешённые / неуверенные имена,
   ненайденные модули, повторы, нормализованный текст; `types [--path] [--tpl]` (`build/tp7types --dump`): ошибки
-  типов, inlay-подсказки, типы имён, тип выражения у каждого оператора / скобки / `^`; `stub [--lib TPL]`
+  типов, inlay-подсказки, типы имён, тип выражения у каждого оператора / скобки / `^`; `lsp [--tp7 DIR] [--step N]
+  [--rename N]` (`build/tp7ls`): сессия LSP на файле (рабочая папка — его каталог), ответ за ответом; `stub [--lib TPL]`
   (`build/tp7stub FILE [UNIT] [--lib TPL] --dump`): текст заглушки каждого модуля TPU / TPL и её индекс.
 - `python/` прототип; при переносе в папку не менялся (кроме `CLAUDE.md`). Его тесты запускаются из любого каталога.
 - `build/` результаты сборки (git их игнорирует).
@@ -75,7 +86,8 @@ x86_64-linux). Прототип остаётся **эталонной реали
   `*_formatted.pas`, TEST.PAS/.TPU, WINXP.PAS/.TPU). OBJECTS.TPU / VIEWS.TPU / SAMPLES*.TPU лежат в `python/samples`
   и в `testdata` класть нельзя: `test_tp7sema.test_samples` ждёт, что модуля `objects` рядом с TEST.PAS нет.
 - `make` собирает `build/tp7ls`; `make test` собирает и запускает тесты FPCUnit (при ошибке код возврата != 0);
-  `make pytest` — все наборы прототипа (оба на `testdata`, другая папка — `DATA=папка`). Должны проходить все.
+  `make pytest` — все наборы прототипа; `make prototest` — протокольные наборы прототипа против `build/tp7ls`
+  (все на `testdata`, другая папка — `DATA=папка`). Должны проходить все.
 - `make compare FILES="testdata python/samples"` запускает `tools/compare.py` для лексера, парсера и форматтера.
 - Папки `../intrfc70` и `../fpc-*` не трогать вовсе (не читать, не использовать для проверок). Для сверки с
   прототипом на большом объёме кода годятся `../BP`, `../robot`, `../vdisk` (только читать).
@@ -114,7 +126,16 @@ x86_64-linux). Прототип остаётся **эталонной реали
    `LocalShadow`, `AnonymousEnum`, `StringConstants`, `SamplesUnit` из `test_tp7tpuobj.py` (`tests/ttpuobj.pas`;
    `Protocol`, `TpuWithoutSource`, `TpuObjects`, `Dependencies` — протокольные). `compare.py stub` чисто на всех
    TPU / TPL этой машины (с `--lib TURBO.TPL` и без) и на 900 испорченных TPU / TPL.
-8. Затем сервер (`tp7lsp`; JSON через fcl-json).
+8. Сервер (`tp7lsp`) — сделано. Протокольные наборы прототипа (`test_tp7lsp`, `test_tp7diag`, `test_tp7edit`,
+   `test_tp7oop`, классы с сервером из `test_tp7stub`, `test_tp7tpuobj`, `test_tp7inc`, `test_tp7index`,
+   `test_tp7types`, `test_tp7perf`) — «чёрный ящик» через stdio: `tools/pyproto.py` (`make prototest`) запускает их
+   без изменений против `build/tp7ls`, все проходят. В FPCUnit (`tests/tlsp.pas`) перенесены тесты внутренностей:
+   `EditComputation` и `Queueing` / `Dependents` / `Caches` из `test_tp7perf.py`, плюс тест выбора `positionEncoding`.
+   `compare.py lsp` (одна и та же сессия через оба сервера, ответы сравниваются как данные; внутренние ошибки
+   -32603 равны при любом тексте) чисто на `testdata`, `python/samples`, `../robot`, `../vdisk` (каждый токен),
+   `../BP` (каждый пятый) и на 300 сломанных / случайных программах. Где прототип падает на сломанном дереве
+   (`kids[0].text` у узла), порт тоже бросает исключение (`KT`), а не читает мусор. `test_tp7ls.py`
+   проверяет старый сервер `python/tp7ls.py` (форматирование и диагностики, его заменил `tp7lsp.py`) и не переносится.
 
 ## Строки и кодировки (решение владельца)
 - Текст исходников внутри порта — UTF-8 (`AnsiString`/`UTF8String`), как приходит от редактора. Файлы с диска

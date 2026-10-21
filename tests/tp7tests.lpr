@@ -3,6 +3,9 @@ program tp7tests;
 {$mode objfpc}{$H+}
 
 uses
+{$IFDEF UNIX}
+  cthreads,
+{$ENDIF}
   consoletestrunner,
   tlex,
   tparse,
@@ -13,7 +16,8 @@ uses
   tindex,
   ttyperules,
   tstubs,
-  ttpuobj;
+  ttpuobj,
+  tlsp;
 
 var
   App: TTestRunner;

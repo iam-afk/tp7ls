@@ -18,6 +18,16 @@
   python3 tools/compare.py tpu [--lib TURBO.TPL] FILE.TPU...   tpu_dump.py vs build/tpudump: --json (parsed and
                                               compared as data), --pas and --names (byte-exact)
 
+  python3 tools/compare.py lsp [--tp7 DIR] [--step N] [--rename N] FILE.PAS...   the server: the same LSP session
+                                              (python/tp7lsp.py vs build/tp7ls, workspace = the folder of the file, tp7Dir =
+                                              DIR) compared reply by reply as data: diagnostics, outline, semantic tokens,
+                                              formatting, code actions, inlay hints, workspace symbols; at every N-th token
+                                              (default 1) hover, definition, declaration, typeDefinition, implementation,
+                                              highlight, references, prepareRename, prepareTypeHierarchy, selectionRange,
+                                              completion and signatureHelp; rename of the first N names (default 3).
+                                              Internal errors (-32603) are equal whatever their text: the exception
+                                              classes of the two languages differ
+
 A directory argument stands for every *.pas / *.inc in it (recursively; *.tpu / *.tpl for `tpu`).  --bin DIR overrides the directory of
 the port's binaries (default: build/).  Exit status 1 if any file differs.
 
@@ -317,6 +327,127 @@ def stub_dump(path, lib):
     return ''.join(out).encode('utf-8')
 
 
+def lsp_messages(path, tp7, step, renames):
+    from tp7lex import lex
+    with open(path, 'rb') as f:
+        text = f.read().decode('cp866')
+    root = os.path.dirname(os.path.abspath(path))
+    import pathlib
+    uri = pathlib.Path(os.path.abspath(path)).as_uri()
+    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+
+    def u16(s):
+        return len(s.encode('utf-16-le', 'surrogatepass')) // 2
+
+    def at(tok, end=False):
+        ln = tok.line - 1
+        line = lines[ln] if ln < len(lines) else ''
+        ch = u16(line[:tok.col - 1]) + (u16(tok.text) if end else 0)
+        return {'line': ln, 'character': ch}
+    td = {'uri': uri}
+    msgs = [{'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {
+        'processId': None, 'rootUri': pathlib.Path(root).as_uri(),
+        'workspaceFolders': [{'uri': pathlib.Path(root).as_uri(), 'name': 'ws'}],
+        'capabilities': {'textDocument': {'documentSymbol': {'hierarchicalDocumentSymbolSupport': True}}},
+        'initializationOptions': {'tp7Dir': tp7} if tp7 else {}}},
+            {'jsonrpc': '2.0', 'method': 'initialized', 'params': {}},
+            {'jsonrpc': '2.0', 'method': 'textDocument/didOpen', 'params': {'textDocument': {
+                'uri': uri, 'languageId': 'pascal', 'version': 1, 'text': text}}}]
+    n = len(lines)
+    whole = {'start': {'line': 0, 'character': 0}, 'end': {'line': n, 'character': 0}}
+    reqs = [('textDocument/documentSymbol', {'textDocument': td}),
+            ('textDocument/semanticTokens/full', {'textDocument': td}),
+            ('textDocument/semanticTokens/range', {'textDocument': td, 'range': {
+                'start': {'line': 0, 'character': 0}, 'end': {'line': min(n, 30), 'character': 0}}}),
+            ('textDocument/formatting', {'textDocument': td, 'options': {'tabSize': 2, 'insertSpaces': True}}),
+            ('textDocument/rangeFormatting', {'textDocument': td, 'range': {
+                'start': {'line': 3, 'character': 0}, 'end': {'line': 12, 'character': 0}}, 'options': {}}),
+            ('textDocument/codeAction', {'textDocument': td, 'range': whole, 'context': {'diagnostics': []}}),
+            ('textDocument/inlayHint', {'textDocument': td, 'range': whole}),
+            ('workspace/symbol', {'query': ''})]
+    sig = [t for t in lex(text) if t.kind in ('IDENT', 'SYM', 'KW', 'INT')]
+    idents = [t for t in sig if t.kind == 'IDENT']
+    for q in sorted({t.text.lower()[:3] for t in idents[:40]}):
+        reqs.append(('workspace/symbol', {'query': q}))
+    poss = []
+    for i, t in enumerate(sig):
+        if i % step:
+            continue
+        p0 = at(t)
+        reqs.append(('textDocument/hover', {'textDocument': td, 'position': p0}))
+        poss.append(p0)
+        if t.kind in ('IDENT', 'INT'):
+            for m in ('definition', 'declaration', 'typeDefinition', 'implementation', 'documentHighlight',
+                      'prepareRename', 'prepareTypeHierarchy'):
+                reqs.append(('textDocument/' + m, {'textDocument': td, 'position': p0}))
+            reqs.append(('textDocument/references', {'textDocument': td, 'position': p0,
+                                                     'context': {'includeDeclaration': i % 2 == 0}}))
+        if t.kind == 'IDENT' or t.text in ('.', '(', ',', ':', '=', '^'):
+            pe = at(t, end=True)
+            reqs.append(('textDocument/completion', {'textDocument': td, 'position': pe}))
+            reqs.append(('textDocument/signatureHelp', {'textDocument': td, 'position': pe}))
+    reqs.append(('textDocument/selectionRange', {'textDocument': td, 'positions': poss[:200]}))
+    seen = set()
+    for t in idents:
+        if len(seen) >= renames:
+            break
+        if t.text.lower() in seen:
+            continue
+        seen.add(t.text.lower())
+        reqs.append(('textDocument/rename', {'textDocument': td, 'position': at(t), 'newName': t.text + 'Zq'}))
+    for k, (m, prm) in enumerate(reqs):
+        msgs.append({'jsonrpc': '2.0', 'id': 100 + k, 'method': m, 'params': prm})
+    msgs += [{'jsonrpc': '2.0', 'id': 99, 'method': 'shutdown'}, {'jsonrpc': '2.0', 'method': 'exit'}]
+    return msgs
+
+
+def lsp_run(cmd, msgs, stubs):
+    import json
+    body = b''.join(b'Content-Length: %d\r\n\r\n%s' % (len(b), b) for b in (json.dumps(m).encode() for m in msgs))
+    env = dict(os.environ)
+    env.pop('TP7_DIR', None)
+    env['TP7LS_STUB_DIR'] = stubs
+    p = subprocess.run(cmd, input=body, capture_output=True, env=env, timeout=3600)
+    out, data, i = [], p.stdout, 0
+    while i < len(data):
+        j = data.index(b'\r\n\r\n', i)
+        n = int(data[i:j].split(b':')[1])
+        out.append(json.loads(data[j + 4:j + 4 + n]))
+        i = j + 4 + n
+    return out
+
+
+def compare_lsp(binary, path, tp7, step, renames, stubs):
+    msgs = lsp_messages(path, tp7, step, renames)
+    a = lsp_run([sys.executable, os.path.join(ROOT, 'python', 'tp7lsp.py')], msgs, stubs)
+    b = lsp_run([binary], msgs, stubs)
+    by_id = {m['id']: m for m in msgs if 'id' in m}
+    out = []
+    ra = {m['id']: m for m in a if 'id' in m and 'method' not in m}
+    rb = {m['id']: m for m in b if 'id' in m and 'method' not in m}
+    for i in sorted(set(ra) | set(rb), key=str):
+        x, y = ra.get(i), rb.get(i)
+        if x != y and not (internal_error(x) and internal_error(y)):
+            req = by_id.get(i, {})
+            out.append('%s %s\n    python: %s\n    port:   %s' % (req.get('method'), json_short((req.get('params') or {}).get(
+                'position')), json_short(x), json_short(y)))
+    na = [m for m in a if 'method' in m]
+    nb = [m for m in b if 'method' in m]
+    if na != nb:
+        out.append('notifications\n    python: %s\n    port:   %s' % (json_short(na), json_short(nb)))
+    return out, len(ra)
+
+
+def internal_error(reply):
+    return isinstance(reply, dict) and (reply.get('error') or {}).get('code') == -32603
+
+
+def json_short(x, limit=600):
+    import json
+    s = json.dumps(x, ensure_ascii=False)
+    return s if len(s) <= limit else s[:limit] + '...'
+
+
 def first_diff(a, b):
     la, lb = a.splitlines(), b.splitlines()
     for i, (x, y) in enumerate(zip(la, lb)):
@@ -356,18 +487,46 @@ def main(argv):
         i = argv.index('--lib')
         lib = argv[i + 1]
         del argv[i:i + 2]
+    tp7, step, renames = None, 1, 3
+    if '--tp7' in argv:
+        i = argv.index('--tp7')
+        tp7 = os.path.abspath(argv[i + 1])
+        del argv[i:i + 2]
+    if '--step' in argv:
+        i = argv.index('--step')
+        step = int(argv[i + 1])
+        del argv[i:i + 2]
+    if '--rename' in argv:
+        i = argv.index('--rename')
+        renames = int(argv[i + 1])
+        del argv[i:i + 2]
     normalize = '--normalize' in argv
     if normalize:
         argv.remove('--normalize')
-    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu', 'sema', 'types', 'stub'):
+    if len(argv) < 3 or argv[1] not in ('lex', 'parse', 'fmt', 'tpu', 'sema', 'types', 'stub', 'lsp'):
         print(__doc__)
         return 2
     mode = argv[1]
-    binary = os.path.join(bindir, 'tpudump' if mode == 'tpu' else 'tp7' + mode)
+    binary = os.path.join(bindir, {'tpu': 'tpudump', 'lsp': 'tp7ls'}.get(mode, 'tp7' + mode))
     if not os.path.exists(binary):
         print('no %s: build the port first (make)' % binary)
         return 2
     bad = total = 0
+    if mode == 'lsp':
+        import tempfile
+        import shutil
+        stubs = tempfile.mkdtemp(prefix='tp7stubs_')
+        try:
+            for path in files(argv[2:]):
+                total += 1
+                diffs, n = compare_lsp(binary, path, tp7, step, renames, stubs)
+                if diffs:
+                    bad += 1
+                    print('DIFF %s (%d of %d replies)\n  %s' % (path, len(diffs), n, '\n  '.join(diffs[:10])))
+        finally:
+            shutil.rmtree(stubs, ignore_errors=True)
+        print('%d files, %d differ' % (total, bad))
+        return 1 if bad else 0
     for path in files(argv[2:], ('.tpu', '.tpl') if mode in ('tpu', 'stub') else ('.pas', '.inc')):
         total += 1
         if mode == 'stub':

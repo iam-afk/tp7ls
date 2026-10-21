@@ -10,7 +10,7 @@ TESTSRC  := $(wildcard tests/*.pas tests/*.lpr)
 PYTESTS  := $(wildcard python/test_tp7*.py) python/test_tpu_dump.py
 CLIS     := $(BUILD)/tp7lex $(BUILD)/tp7parse $(BUILD)/tp7fmt $(BUILD)/tpudump $(BUILD)/tp7sema $(BUILD)/tp7types $(BUILD)/tp7stub
 
-.PHONY: all test pytest compare clean
+.PHONY: all test pytest prototest compare clean
 
 all: $(BUILD)/tp7ls $(CLIS)
 
@@ -31,6 +31,9 @@ test: $(BUILD)/tp7tests
 
 pytest:
 	@rc=0; for t in $(PYTESTS); do echo "== $$t"; python3 $$t $(DATA) || rc=1; done; exit $$rc
+
+prototest: $(BUILD)/tp7ls
+	python3 tools/pyproto.py $(DATA)
 
 compare: all
 	python3 tools/compare.py lex $(FILES)
