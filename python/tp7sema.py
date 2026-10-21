@@ -877,7 +877,9 @@ class Binder:
     def collect_routine(self, r: Node, scope: Scope, link_table):
         name_tok, params, res = self.routine_parts(r)
         key = name_tok.text.lower()
-        has_body = any(isinstance(x, Node) and x.kind == 'Block' for x in r.kids)
+        dirs = next((x for x in r.kids if isinstance(x, Node) and x.kind == 'Directives'), None)
+        has_body = any(isinstance(x, Node) and x.kind == 'Block' for x in r.kids) \
+            or dirs is not None and any(is_tok(t, 'external') for t in dirs.kids)    # the body is in an .OBJ
         if routine_names(r)[0] is not None:                  # procedure T.M: implements a method, declares nothing
             _, m = self.method_of(r, scope, link_table)
             if m is not None and has_body and not getattr(m, 'has_body', False):

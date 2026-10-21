@@ -2029,14 +2029,20 @@ end;
 procedure TBinder.CollectRoutine(R: TNode; Scope: TScope; LinkTable: TSymTable);
 var
   NameTok: TToken;
-  Params, Res_, Owner, DN: TNode;
+  Params, Res_, Owner, DN, Dirs: TNode;
+  X: TObject;
   Key: string;
   HasBody: Boolean;
   TS, M, Existing, Sym: TSym;
 begin
   RoutineParts(R, NameTok, Params, Res_);
   Key := LowerText(NameTok.Text);
+  Dirs := FirstKid(R, nkDirectives);
   HasBody := FirstKid(R, nkBlock) <> nil;
+  if (Dirs <> nil) and not HasBody then
+    for X in Dirs.Kids do
+      if IsTok(X, 'external') then
+        HasBody := True;
   RoutineNames(R, Owner, DN);
   if Owner <> nil then
   begin

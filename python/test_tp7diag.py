@@ -174,6 +174,12 @@ class DuplicatesAndMissingBodies(Base):
         src = 'program a;\nprocedure Ext; external;\nbegin\n  Ext;\nend.\n'
         self.assertEqual(self.errs(src), [])
 
+    def test_external_in_implementation_implements_the_interface(self):
+        src = ('unit u;\ninterface\ntype O = object\n    procedure M;\n  end;\nprocedure P(X: Integer); far;\n'
+               'function F: Integer;\nimplementation\n{$L u.obj}\nprocedure O.M; external;\n'
+               'procedure P(X: Integer); far; external;\nfunction F: Integer; external;\nend.\n')
+        self.assertEqual(self.errs(src), [])
+
 
 class SignatureHelp(Base):
     def sig(self, src, marker='|', files=None):
