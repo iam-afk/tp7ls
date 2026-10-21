@@ -4,8 +4,8 @@ Language server для Turbo Pascal 7.
 
 - `python/` — рабочий прототип на Python (описание: `python/README.txt`); эталон и спецификация для порта.
 - `src/`, `tests/` — порт на Free Pascal 3.2.2 (порядок и правила — в `CLAUDE.md`). `build/tp7ls` — сервер (LSP
-  через stdio), заменяет `python3 python/tp7lsp.py`: в настройке Neovim (`python/tp7.lua`)
-  `server = { '/путь/к/build/tp7ls' }`.
+  через stdio), заменяет `python3 python/tp7lsp.py`.
+- `nvim/` — плагин для Neovim (установка и настройки: `nvim/README.md`).
 - `tools/compare.py` — сверка порта с прототипом на одних и тех же файлах; `tools/pyproto.py` — протокольные тесты
   прототипа против сервера порта.
 
